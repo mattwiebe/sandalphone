@@ -1,0 +1,805 @@
+Every thought and so concluded that the woman who gave beer and we at the shop was from the faith.
+
+Lifting from the faith.
+
+Oh, fucking hell.
+
+This woman is like in the aux zone, like, we're there to get coke for a site meeting.
+
+A site meeting.
+
+Dust in the house.
+
+It's just a horrible day for dust.
+
+They do some intense drilling with the curtain. not secured for his dad and brother.
+
+I forget his name now.
+
+Umberto.
+
+They call him Berto.
+
+And his sons are all Umbertoitos. there's three brothers anyway And so Just having the ghetto hack idea of like running the dryer out the window.
+
+So...
+
+So I really do want an agent that can scan my emails, my documents, pick up themes, interlink those themes with like a brief theme document stub.
+
+How could I build an assistant system that I want to use?
+
+How would I want to use it?
+
+So this guy is just seeing on Twitter, I'm inspired by him.
+
+He built... he built something where he went for a walk every morning and just talked into his phone.
+
+And...
+
+Yeah.
+
+And so I want to hook it up Do I want to talk to me?
+
+Do I want a total voice interface here?
+
+Ideally, it would be a total voice interface.
+
+Total Jarvis.
+
+And I can run it at full capabilities on my computer.
+
+The phone doesn't allow enough cross access to be useful.
+
+I want to build a Jarvis on my Mac.
+
+Seems like a fun project.
+
+There's clogged co-work already.
+
+And maybe that's good enough.
+
+Especially if I can run it in pro.
+
+I'm currently just not that interested in digital privacy.
+
+Like somebody posted a joke about, you know, digital privacy over the years and now like something about the machines having to rest away control and we're like throwing it at it in order to be called you know there's this new automation suite personal automation suite called claude bot c-l-a-w-d as of today they were forced to change their name to claw bot like a lobster claw and that was relevant for some reason i escaped but the joke was everyone's like rushing to give the keys to all their stuff to claw bot um I was thinking about, so like we gave them the keys to everything so they couldn't help take over almost.
+
+But it would speak to the like tedium of a lot of digital communication.
+
+So like on this self-same walk, I could be plugged in, having a conversation with my assistant about what things need doing, dispatch it to do tasks for me.
+
+I could just do it while walking around.
+
+Why am I sitting like a moron at my desk?
+
+I could just do this walking around through a voice assistant.
+
+That would require me to sort of leave.
+
+Right now, I only want it mostly centered on my MacBook.
+
+I want to be able to take it with me.
+
+I want to be able to run this system where I can...
+
+Maybe there's some queries I just only want to stay on my computer.
+
+And I've got a pretty powerful computer.
+
+I can do a fair few things on it.
+
+You know, so this seems like this new Alibaba model.
+
+I think it does full voice duplex encoding, like doing like whisper style transcription, but like speech is more of a first class embedding than text, although they, you know, still are trained on a lot of text.
+
+It's not a back and forth as far as I understand it.
+
+It's almost like you would need.
+
+Maybe it can still encode to text and its responses, but it doesn't have to.
+
+So you can just stay in voice mode as far as I understand it.
+
+So I could run something like this.
+
+And is it like a suite?
+
+Can you do just the encoder and decoder, and then I can send the vector stream to my Mac?
+
+Would I need to set up a server somewhere to orchestrate all of this?
+
+At which point I could just rent.
+
+GPUs.
+
+I kind of like the lo-fi approach of trying to run as much as possible off of my Mac.
+
+While I'm walking around, it's like, I'm fine if you take 20 minutes to get back to me, you know, I've got to build a queue. for whatever talks to the API.
+
+Right now it looks like the GLM47 model.
+
+So a queue of, you know, what API should I talk to for this?
+
+When I want to set off a web search for sourcing, I really do like to start with Gemini.
+
+So that goes in the web.
+
+So you've got sync and async.
+
+Sync for local operations and async for remote APIs.
+
+I really got to improve my local transcription pipeline.
+
+Again, I might not need to with this, so fuck it.
+
+I guess I'll always want textual archives.
+
+It's because text is still a better...
+
+Like, I don't think we can...
+
+I don't think I can trust it otherwise.
+
+I'd still have to have a text transcript.
+
+I mean, hopefully keep the audio transcripts too, in some fashion.
+
+M4A for example, pretty low bit rate maybe.
+
+I don't know.
+
+Just a big bottle in here. storage is cheap enough these days.
+
+Don't see why not.
+
+I have it already, like, reams of it in my iCloud.
+
+So I want sort of this...
+
+It's this stream model.
+
+Like, how do you separate this out?
+
+Because you want it to cross-pollinate in any fashion.
+
+You want it to get to know your preferences. so I feel stalled because I'm sitting so why don't I walk around then I've got the nest cam right got the nest cam so I can always keep an eye on things it can be reached by text by the contractor and I'll just stay close by.
+
+But I just gotta walk around.
+
+The kids can...
+
+Kids can just talk into the Nest Cam and I'll get alerted.
+
+And so So off that setup again, I'll have to have some kind of stream monitor of that video because Google's own alerting is insufficient to just when he speaks dad that I get it.
+
+And so I want this to automatically turn on when I leave the house or even just speak a command, enable. enable walking protocol right enable leaving the house protocol and i want to say it as soon as it happens but it can you can geofence me too and just do it for me if i forget because i'm adhd you know see if it can anyway drive beeper because I've already got all my aughts centralized through beeper and especially if I'm talking back to my computer it's got the local gateway to iMessage it's got all my comms, it's got all my emails of course Gemini can have all my emails too if I let it it's so low that Google's had that shit for this whole time they're at least moderately monitored I guess it's got to go all in multi Google account off of course I've got not a pizza bar I've got Matt Wiebe so right here in the middle of just recording I just want to I want to be able to speak something you know that basically accesses menu commands or macros that like create some kind of new, like of course here to like spin off a query, spin off a task, spin off a MCP query.
+
+You know, like I have any emails today that need responding to.
+
+I have a task list somewhere and just like a flat messy task list and I can use Jarvis to like surface ones related to this or related to that or just run through the whole list or if there's just stuff to do.
+
+And so it can be, it can sort of be streaming duplettes back to my MacBook.
+
+I need to set up, I think, this Farcaster network.
+
+Farcaster, I think it's called.
+
+Just to make technology work for me in a way I'm happy about.
+
+Just talk to it.
+
+I can do text.
+
+And get it to write code for me, and then just summarize the diffs functionally, like reading the code and what's being changed here. various levels of granularity.
+
+Right, line by line or chunk by chunk or file by file.
+
+I don't know.
+
+Spitballing.
+
+It's fun to think.
+
+Fun to just let it flow.
+
+To not have to do any of this.
+
+It's just fun to momentarily fancy that I could enjoy making some software this way. like running the pizza biz, doing ordering, doing procurement, doing vendor relations, doing payments.
+
+A little dance I have to do in order to send wise payments right now.
+
+The dances I'll still have to do to send bank transfers and request facturas and to accounting.
+
+Like, I just want I want the bots to do everything for me.
+
+It's like I'm gonna be building systems to run this restaurant anyway.
+
+I should be building AI into all of those systems to work for me. and like I want to cancel ChatGPT for instance.
+
+Get all the chips in club, maybe even get a Mac subscription. you know, again from this remote paradigm where I have an agent that's able to drive my entire MacBook for me.
+
+I need, of course, all of this data has to be backed up to the cloud in some fashion.
+
+Because if my laptop goes down, that's a critical failure.
+
+I need to be able to swap into a new laptop at any given time.
+
+This has to be fully portable, fully cloud synced.
+
+I can't believe it's building some parts of it in the way it does.
+
+For shits and giggles.
+
+Bye.
+
+Of course I can have a website that I fully control and do stuff through AI.
+
+Right, WordPress goes MCP, sure why not.
+
+It's a pretty viable web publishing way, but maybe I could do better.
+
+Maybe I can do better than Parrot.
+
+Is there an open source POS system?
+
+right this would be something to send an agent to look up is there an open source POS system could I cobble together something that works well here or again then I just do simple payments through like I'll go into this clip, right?
+
+Could I issue my own facturas digitally fairly easily with just a little bit of chops?
+
+Seems like you have to do some kind of digital signing. with your shit or whatever and it probably has to be filed against government.
+
+I know you need to separate factura and non-factura transactions. transactions.
+
+In fact, her transactions the government automatically knows about.
+
+I don't know if you have to file those pretty much immediately upon issue.
+
+I believe that is the case.
+
+And...
+
+Once again, the joint goes out.
+
+It's a sign you shouldn't smoke anymore.
+
+I don't want to get any more cigarette.
+
+It's a good night, what?
+
+I'm looking forward to it.
+
+I cannot go to 10.30.
+
+This has been just fun talking, apparently. oh I want to build.
+
+I want to build.
+
+So, and so then building this system in a way that knows how to prompt me best just like I've always been a good talker I've always think better when I talk and the having to be nonverbal into a computer I just want to talk so right I want I want to be able to talk into this thing.
+
+I want to be able to just have it listen for various voice cabads.
+
+So I want to like, boom, go, I want to enter translate mode.
+
+Right?
+
+now the that's gotta be on my phone so I can show it to people so that's tricky but like the apple one it's not good enough and this is the like tragedy of iOS is I don't think I can like run that real-time transcription through an API.
+
+Should I be streaming it?
+
+I mean, Jesus Christ, like, I am streaming through... my own server and i mean this is no time to get cute the off center is in the cloud probably um All right.
+
+Shit like, how do I decommission my rod result?
+
+Could I send it to someone in Canada?
+
+Could I do it from here?
+
+So I'm activated.
+
+Could I try to transition it to that other phone I have?
+
+Right?
+
+Like, got another iPhone.
+
+Like an iPhone, I don't know, 12, I think, in commission currently.
+
+And so I want this thing to be able to run. something in the cloud so I can be called on whatsapp and just kind of be alerted just stream yeah take the whatsapp thanks oh fucking is the water on Hallelujah Hallelujah The war has been off all fucking day now I had a beautiful time tucking my children into bed.
+
+I just need to spend my bedtime with them.
+
+It's precious time.
+
+Just been like, fuck off out of here.
+
+Good, I got you to bed.
+
+Good night.
+
+Bye.
+
+I'm so stressed.
+
+I'm fucking roasted by chat GPT astrology today.
+
+Okay, speaking of which.
+
+I'll put my glasses in here I hope so All right.
+
+Where did I put them?
+
+Where did I put them?
+
+I don't know if I was young.
+
+So good.
+
+Jack is going to sink.
+
+Pointless food.
+
+Anyway, Sort of like Spanish phone calls.
+
+I want to root those phone calls in such a way that I'm getting real-time translation from Spanish.
+
+I want to say something in English and have my AI assistant immediately translate it for the person and read it out to them in a voice that sounds like mine.
+
+I'll have to tweak it a bit, though, to make it obvious it's a robot voice. that should be easier to do if I am but like the cell thing is going to be hard to lick because it just so takes over and how can I get Unless Unless I run a sim station basically at my laptop that's just streaming I mean ideally I would have it I guess on like raspberry pi something like that where it's just streaming the you know the phone and sms right and then I wouldn't have to keep it in my phone anymore It's like I'm building a whole ops thing, a whole ops team.
+
+And I can interact with it just by talking to them.
+
+Stream in.
+
+Take voices, transform them on the fly.
+
+Like...
+
+Hey, I don't speak Spanish very well, but I've got this weird AI translation tool that might let us talk to each other.
+
+Are you cool with trying that?
+
+Or can you speak English?
+
+I'm really trying to learn Spanish.
+
+I'm sorry.
+
+Thank you.
+
+Thank you.
+
+My...
+
+I hope this works.
+
+Wouldn't that be amazing?
+
+That would be so helpful for me.
+
+I can't know Spanish as well as I would like to know it yet.
+
+And so so this would so this would need to be managed is just a continual audio stream duplex to a server, right?
+
+And so that could be just like a...
+
+Telegram seems to be in favor for this one.
+
+CloudBot now, MoltBot, MoltBot.
+
+We'll have to look into that. it's a full duplex has access to everything but always has to get to a point approval point to like run let's call them right operations telegrams.
+
+And so on that server, taking this telegram call, It can spawn agents and mix in audio.
+
+So audio from other call sources, the SMS and voice from the SIM card stuff.
+
+You know, all your various verticals.
+
+Get it to drive your laptop.
+
+Spin off queries.
+
+Do research projects.
+
+It's a continual phone call, right, that the server can mix different sources into.
+
+Do you like, yeah.
+
+Just do it this way.
+
+Right, call Jacqueline and mix her in.
+
+Right.
+
+Um, fascinating. always transcribing.
+
+And then I want some type of display from whatever source I want.
+
+I want to be able to you know, say so would it be a video stream to the phone that's rendered in the cloud?
+
+Interesting idea.
+
+But like show um translate everything.
+
+I mean, all I need, I mean, I'm on the phone call.
+
+It's all audio.
+
+And so all I'd need to do is put the phone on speaker and speak.
+
+So then my headphones, I'm speaking in speaker phone.
+
+It can, you know, recognize my voice, translated immediately.
+
+There's like this translating thing.
+
+Right?
+
+Because I could do this with Arturo.
+
+I could do this with Jorge when he doesn't know how to speak of it in English.
+
+You know?
+
+enter translation mode or enter, yeah enter conversation mode enter translation mode it goes into that so I've always thought this call building non-stop right So if the call drops, the server should be like pinging me, texting me.
+
+So I want...
+
+Apple Watch alert that'll really buzz me for certain things.
+
+Receive pings from the server.
+
+You know, I want to know what's on the doorbell rings.
+
+I want to know when my kids say one of the code words into one of their...
+
+Even into just the nest cam.
+
+Once Elliot has a phone, he can just call me also.
+
+That'll do it.
+
+But, hey, Dad.
+
+You know, just say my name.
+
+Say my name three times or something.
+
+So I need to get those pings to just reestablish connection.
+
+Especially as I walk around, I'm going to be dropping signal all the time.
+
+I don't know if I can get a secondary unpublished stem card I don't do voice-only sincere anywhere nobody does it it's not that expensive It's like 200 a month.
+
+It's not that expensive.
+
+So I'm going data mode through like WhatsApp or Telegram.
+
+That'll even signal. signal will be pretty badass probably but i don't know how the audio quality is so i rely on one of these phone infrastructures and while i'm walking around shit's gonna go down appealing thing about whatsapp is it's got the retry So that's pretty good.
+
+Maybe Telegram does too.
+
+Oh, yeah, I'm getting the buzz.
+
+So I'd have...
+
+So the trick is... on iOS, when you want to switch over the video screen, that's going to have to be its own dedicated app.
+
+Right?
+
+And it'll have to take over the audio stream as well.
+
+Right?
+
+That's fine.
+
+You should be able to switch channels and communication.
+
+You should be able to call into the damn thing from somebody else's thing if you give the right codes, right tools, passwords.
+
+Why not?
+
+Same sketch though.
+
+Let's not build that kind of backdoor into it.
+
+I'm looking to bone conducting headphones.
+
+I guess I could pair them with Bluetooth to the phone.
+
+It doesn't have to be these AirPods.
+
+It's my third advantage, though, for notes canceling.
+
+I would play me music.
+
+So just I'm always in this stream.
+
+It's almost tempting.
+
+So yeah, like I'd want to, I'd want to mostly rely but then yeah it could have a some kind of full duplex connection audio and video like it's showing video so it can show me it can show Arturo translations on screen but I guess again I don't need that I don't need to show him that Right?
+
+What do I need video for?
+
+I need video for, say, tuning into the Nest Cam.
+
+Tuning into, you know, my whole array of cameras.
+
+Being able to select one.
+
+Show me this one.
+
+Just tell it.
+
+Show me this one.
+
+Okay.
+
+The message can identify that it's, uh, you can talk to this shit, right?
+
+So.
+
+Thank you.
+
+Dare I make a Docker image?
+
+I've had a bad attitude about Docker forever.
+
+Maybe it's okay.
+
+I need to figure out a way to package all this up.
+
+Right, so the cloud component, and then there's the local Mac component.
+
+Of course there could be a Linux component.
+
+It needs to be in real time streaming with your, you know, LTE or 5G connected device, streaming data, streaming voice, translations.
+
+Ask the killer app for me.
+
+Продолжение следует...
+
+Solo mode and conversation mode.
+
+Spinning up a little daemon that I just talk to and it does my bidding.
+
+I mean, what's better?
+
+This is a joke I had.
+
+Claude, call it Levi, the servant of the Lord, the servant of the Lord's temple, the priest of the Lord.
+
+Interesting thoughts about using the stereo field in solo mode. like to say pipe like I'm in I'm in a store getting change, right?
+
+I'm in a store getting change and it picks up what the cashier says, hopefully, in best case, operations.
+
+Picks up what the cashier says. translates it into my ear.
+
+And I say, I'm trying to say, I want to say, Jarvis, I want to say, Levi, I want to say, da-da-da-da-da-da.
+
+And then if they can speak in English, fine.
+
+But it's going to be running that against the translation API immediately and speaking back to me what I should say.
+
+And then I can say it. and get that practice immediately.
+
+Boom, this is what I should say.
+
+It's handing over a lot of trust.
+
+So I can always make it say, "I think maybe..."
+
+Pardon me, my Spanish is very poor.
+
+I'm trying to say to...
+
+And it streams it back to me.
+
+Killer app right here.
+
+Is the Apple on-device shit?
+
+I don't know, man.
+
+I've seen...
+
+I've seen the transcripts it's putting out.
+
+It looks like hot garbage. and I've tried to use the API in this place notes app.
+
+No thanks.
+
+No thanks.
+
+Yes, please.
+
+Take a little while to the cookies, as is my prerogative in getting home.
+
+Like, just nice pacing around, I'm just like, Pacing around the island in my kitchen looks like we all know.
+
+Wildworm spot to paste.
+
+You know?
+
+Have your own...
+
+Cougar!
+
+Jacqueline would probably want to run the translation mode too.
+
+And so.
+
+No power just translate things. but you can add capabilities.
+
+You know, she can take all her calls through this as well.
+
+It's like running it through that processing service lets you just do all kinds of stuff to it that you want to, right?
+
+and give it some whimsy in conversation mode ini This is a crackpot idea.
+
+I want this to run my pizza ops.
+
+I'm talking to vendors.
+
+I could have, yeah, Like I just go into speaker mode on the phone, and it just talks back and forth, and that's all you need there.
+
+Hey, can you try this translation tool with me?
+
+Make it funny.
+
+Make it whimsical. so Always alone.
+
+And so, so, you know, clearly I start with my AirPods Pro and I just do one ear at a time mostly, right?
+
+The interphone conducting So.
+
+So.
+
+Levi.
+
+Levi.
+
+Just Levi. type.
+
+And I want to be able to say, Levi, task, retrieve, out carrier, and umbrella from downstairs.
+
+I'm just thinking, oh, it's going to be so hot here.
+
+I can't pay this during the day.
+
+Yeah, that's why I want to be able to do it on this and then paste through the streets.
+
+But I may have to actually be still using a lot of computer to get this started.
+
+*Sounds of anyway I should go to bed my fever dreams of what I could be capable of pretty good vision for what I want to do I'm going to put the dishwasher in I'll just be like Levi, grocery item.
+
+I'll open it to my annulus. ...
+
+It's like sitting at the computer makes me feel like a cake animal.
+
+I need to enjoy sitting still because it was the freeze stance, blah, blah, blah.
+
+Субтитры сделал DimaTorzok ... so yeah fun idea So you can inject video and just switch to a video call.
+
+You can just inject video.
+
+Inject just a web browser.
+
+You can inject whatever is on.
+
+The entire operating system.
+
+Субтитры сделал DimaTorzok Give it a skill to like...
+
+I'm like, yeah, talking to him. talking to Mexicans like I would want to default translate mode just translate into So if I run it in here like this, I don't know.
+
+I just set stealth mode, conversation mode. so it's learning to listen to recognize your own voice and of course picking up anything else around you but like so then I like say it back right I'm trying to remember how to say and so the cool thing is I give them a prompt I kind of remember how to say is that your best price?
+
+and it will prompt me I very much want this to be just this real time tutor it's always there to help me translate and speak the right thing contextually I have to have huge trust that this is like in a speak in a very you know Latin American Mexican centric idiom not like so I'd be interested to know how much this voice model can be tuned that way.
+
+But holy shit.
+
+This is the first killer app for sure.
+
+Even if it's just read-only.
+
+Even if it's just grabbing what anyone says and translating it.
+
+The cool thing is it's offering them in the conversation mode, it's offering them a back and forth.
+
+It's offering them a translation of their words into English.
+
+They get to learn some English too.
+
+That was a pretty cool exchange.
+
+I love that.
+
+Vielen Dank. selamat menikmati You let the person you're talking to in your life.
+
+Let them customize their voice again, that's the future.
+
+Give it some joy, right?
+
+Give it some delight, give it some creepiness.
+
+It's like...
+
+You know, Star Trek Universal Translation.
+
+So there'd be a web page.
+
+Kind of proxy into it so I can do stuff in a web browser.
+
+I mean, I go to a web browser, and we can...
+
+I can just take over.
+
+And I can store new cookies with what's streamed back or not.
+
+Yeah, we just log in local only or...
+
+Why isn't this exciting?
+
+Isn't this so great?
+
+I don't like the sound of only else excited there. ...
+
+I think I got the dishwasher started.
+
+Excellent.
+
+Mm-hmm.
+
+Okay, got the dishes.
+
+My kids hoodies up here. so so So, we're going to need more headphone battery capacity. the air pods that might be okay to just be continuing switching them in and out but I should have a whole bank with two ports or two power banks keeping that case charged up or do I think I could get it through the day but I I need to be able to charge it without this, in case it gets low.
+
+The phone, 'cause the phone's just always on, talking, so it's going hard.
+
+You don't wanna, you don't wanna battery.
+
+This works, this is magic.
+
+This is actual magic. selamat menikmati And so...
+
+Enter consent mode.
+
+Okay, are you okay to be recorded by my system that does translation?
+
+Doh, doh, doh, doh, doh, doh, doh, doh, doh, doh.
+
+I'm gonna just say enter, enter. and then the voice says...
+
+I will translate your robot voice into a mic, is that okay?
+
+Yes.
+
+Say something to me and I'll translate it back to you.
+
+And like, I could even say, say repeat that last phrase oh i feel like no i can go back and review what did they say selamat menikmati Real test would be at a party.
+
+Well, it's a background noise, but hey, whatever. ...
+
+It's such a classic case of getting high as though they just forgot to drink my beer.
+
+It's just, I just need to drink so much less.
+
+It's just not even doing anything for me.
+
+Maybe it's making me sleep and I'm just going to drink six weeks.
+
+It's really... it's enough.
+
+Very exciting. ...
+
+Субтитры сделал DimaTorzok Продолжение следует...
+
+Продолжение следует... selamat menikmati Terima kasih. ...
+
+You know.
+
+Субтитры создавал DimaTorzok Продолжение следует...
+
+Продолжение следует...
+
+Продолжение следует...
