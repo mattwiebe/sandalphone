@@ -2,19 +2,31 @@
 
 A voice-first AI assistant focused on real-time Spanish/English translation, with plans to expand into a full personal assistant for restaurant operations and daily tasks.
 
-## Project Status: Phase 1 - Local Pipeline Complete! ✓
+## Project Status: Phase 2 - Ready for Deployment! 🚀
 
 **What's Working:**
+- ✅ **Phase 1**: Local translation pipeline (STT → Translation → TTS)
+- ✅ **Phase 2**: WebSocket server + Telegram bot (ready to deploy!)
+
+**Components:**
 - ✅ Whisper.cpp with Metal acceleration (16x real-time on M4 Max)
 - ✅ Qwen2.5-7B-Instruct (4-bit quantized) for translation
-- ✅ Qwen3-TTS 0.6B (4-bit quantized) for speech synthesis
-- ✅ Full local translation pipeline: Audio → Transcribe → Translate → Synthesize
+- ✅ FastAPI WebSocket server for remote access
+- ✅ Telegram bot with voice message handling
+- ✅ Tailscale setup for secure Mac ↔ Cloud connection
 
 **Performance on M4 Max:**
-- **Transcription**: ~500ms for 11 seconds of audio (27x real-time with tiny model, 16x with base)
-- **Translation**: ~2-3 seconds for typical sentences
-- **TTS**: Using macOS `say` as placeholder (Qwen3-TTS integration pending)
-- **Total latency**: ~3-5 seconds for full pipeline
+- **Transcription**: ~500ms for 11s audio (21.8x real-time)
+- **Translation**: ~1.5s for typical sentences
+- **TTS**: ~200ms (macOS `say` placeholder)
+- **WebSocket round-trip**: 2.2s total latency ⚡
+
+**Next Steps:**
+1. Set up Tailscale and get your Mac's IP
+2. Create Telegram bot via @BotFather
+3. Configure and test!
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete setup guide.
 
 ## Architecture
 
