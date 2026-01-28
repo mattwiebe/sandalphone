@@ -38,21 +38,31 @@ class TranslationClient:
         Returns:
             Translated text
         """
-        # Create translation prompt - use a more structured format
+        # Create translation prompt with few-shot examples to guide the model
         if source_lang == "es" and target_lang == "en":
-            prompt = f"""<|im_start|>system
-You are a professional translator. Translate the following Spanish text to English. Provide only the direct translation, no explanations or additional text.<|im_end|>
-<|im_start|>user
-{text}<|im_end|>
-<|im_start|>assistant
-"""
+            prompt = f"""Spanish: Hola
+English: Hello
+
+Spanish: ¿Cómo estás?
+English: How are you?
+
+Spanish: Buenos días
+English: Good morning
+
+Spanish: {text}
+English:"""
         elif source_lang == "en" and target_lang == "es":
-            prompt = f"""<|im_start|>system
-You are a professional translator. Translate the following English text to Spanish. Provide only the direct translation, no explanations or additional text.<|im_end|>
-<|im_start|>user
-{text}<|im_end|>
-<|im_start|>assistant
-"""
+            prompt = f"""English: Hello
+Spanish: Hola
+
+English: How are you?
+Spanish: ¿Cómo estás?
+
+English: Good morning
+Spanish: Buenos días
+
+English: {text}
+Spanish:"""
         else:
             raise ValueError(f"Unsupported language pair: {source_lang} -> {target_lang}")
 
@@ -61,7 +71,7 @@ You are a professional translator. Translate the following English text to Spani
             self.model,
             self.tokenizer,
             prompt=prompt,
-            max_tokens=200,
+            max_tokens=50,  # Keep it short to prevent hallucinations
             verbose=False
         )
 
