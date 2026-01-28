@@ -1,0 +1,70 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Models (large files)
+mac/models/whisper.cpp/
+mac/models/qwen-7b-4bit/
+mac/models/qwen3-tts-0.6b/
+
+# Data
+mac/data/
+*.db
+*.sqlite
+
+# Audio files
+*.wav
+*.mp3
+*.m4a
+*.ogg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Secrets
+.env
+*.pem
+*.key
+config.json
+secrets/
+
+# Logs
+*.log
+logs/
+
+# Cloudflare
+.cloudflared/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
