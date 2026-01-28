@@ -38,12 +38,15 @@ class TranslationClient:
         Returns:
             Translated text
         """
-        # Use simple, direct instruction - Qwen models work best with clear tasks
+        # Be VERY explicit about what language the input is in
         if source_lang == "es" and target_lang == "en":
-            # Just ask for the translation directly
-            prompt = f"Translate to English: {text}\n\nEnglish translation:"
+            prompt = f"""This is Spanish text: "{text}"
+
+Translate it to English:"""
         elif source_lang == "en" and target_lang == "es":
-            prompt = f"Translate to Spanish: {text}\n\nSpanish translation:"
+            prompt = f"""This is English text: "{text}"
+
+Translate it to Spanish:"""
         else:
             raise ValueError(f"Unsupported language pair: {source_lang} -> {target_lang}")
 
@@ -52,7 +55,7 @@ class TranslationClient:
             self.model,
             self.tokenizer,
             prompt=prompt,
-            max_tokens=30,  # Short to prevent over-explaining
+            max_tokens=50,  # Enough for translation but not too much
             verbose=False
         )
 
@@ -61,21 +64,36 @@ class TranslationClient:
 
         import re
 
-        # Aggressive cleanup: Remove anything after explanation keywords
-        # Use regex to catch all variations (with or without preceding space/punctuation)
-        pattern = r'[\s.!?]+(This|You|It|The)\s'
+        # First, strip any leading/trailing quotes
+        translation = translation.strip('"\'').strip()
+
+        # If there's a closing quote followed by more text, cut it there
+        # Pattern: quote followed by space and more words (likely explanation)
+        match = re.search(r'["\'][\s.!?]+\w', translation)
+        if match:
+            translation = translation[:match.start()].strip()
+
+        # Remove anything after explanation keywords
+        pattern = r'[\s.!?]+(This|You|It|The|Sure)\s'
         match = re.search(pattern, translation)
         if match:
             translation = translation[:match.start()].strip()
 
         # Also check for period/question mark followed by ANY capital letter
-        if not match:  # Only if we haven't already truncated
+        if not match:
             match = re.search(r'[.!?]\s+[A-Z]', translation)
             if match:
                 translation = translation[:match.start() + 1].strip()
 
-        # Clean up whitespace
+        # Final cleanup
         translation = ' '.join(translation.split()).strip()
+        translation = translation.strip('"\'').strip()  # Remove any remaining quotes
+
+        # If the translation appears to repeat itself, take only the first occurrence
+        # Split by closing quote + opening quote pattern
+        if '?" "' in translation or '." "' in translation:
+            translation = translation.split('" "')[0].strip()
+            translation = translation.strip('"').strip()
 
         return translation
 
