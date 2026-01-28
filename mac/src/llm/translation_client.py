@@ -15,7 +15,7 @@ class TranslationClient:
             model_path: Path to MLX model directory
         """
         if model_path is None:
-            model_path = Path(__file__).parent.parent.parent / "models" / "qwen-7b-4bit"
+            model_path = Path(__file__).parent.parent.parent / "models" / "qwen-14b-4bit"
 
         self.model_path = Path(model_path)
 
@@ -38,31 +38,12 @@ class TranslationClient:
         Returns:
             Translated text
         """
-        # Create translation prompt with few-shot examples to guide the model
+        # Use simple, direct instruction - Qwen models work best with clear tasks
         if source_lang == "es" and target_lang == "en":
-            prompt = f"""Spanish: Hola
-English: Hello
-
-Spanish: ¿Cómo estás?
-English: How are you?
-
-Spanish: Buenos días
-English: Good morning
-
-Spanish: {text}
-English:"""
+            # Just ask for the translation directly
+            prompt = f"Translate to English: {text}\n\nEnglish translation:"
         elif source_lang == "en" and target_lang == "es":
-            prompt = f"""English: Hello
-Spanish: Hola
-
-English: How are you?
-Spanish: ¿Cómo estás?
-
-English: Good morning
-Spanish: Buenos días
-
-English: {text}
-Spanish:"""
+            prompt = f"Translate to Spanish: {text}\n\nSpanish translation:"
         else:
             raise ValueError(f"Unsupported language pair: {source_lang} -> {target_lang}")
 
@@ -71,25 +52,30 @@ Spanish:"""
             self.model,
             self.tokenizer,
             prompt=prompt,
-            max_tokens=50,  # Keep it short to prevent hallucinations
+            max_tokens=30,  # Short to prevent over-explaining
             verbose=False
         )
 
-        # Extract just the translation (remove prompt echo)
+        # Extract just the translation (remove prompt echo and explanations)
         translation = response.strip()
 
-        # Sometimes the model adds extra explanation - try to extract just the translation
-        # Look for the actual translation after the prompt
-        if source_lang == "es":
-            if "English:" in translation:
-                translation = translation.split("English:")[-1].strip()
-        else:
-            if "Spanish:" in translation:
-                translation = translation.split("Spanish:")[-1].strip()
+        import re
 
-        # Remove any trailing explanations
-        if "\n\n" in translation:
-            translation = translation.split("\n\n")[0].strip()
+        # Aggressive cleanup: Remove anything after explanation keywords
+        # Use regex to catch all variations (with or without preceding space/punctuation)
+        pattern = r'[\s.!?]+(This|You|It|The)\s'
+        match = re.search(pattern, translation)
+        if match:
+            translation = translation[:match.start()].strip()
+
+        # Also check for period/question mark followed by ANY capital letter
+        if not match:  # Only if we haven't already truncated
+            match = re.search(r'[.!?]\s+[A-Z]', translation)
+            if match:
+                translation = translation[:match.start() + 1].strip()
+
+        # Clean up whitespace
+        translation = ' '.join(translation.split()).strip()
 
         return translation
 
