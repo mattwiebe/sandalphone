@@ -1,0 +1,162 @@
+"""
+Main FastAPI server for Levi translation service.
+Exposes WebSocket endpoint for remote access via Cloudflare Tunnel.
+"""
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
+import asyncio
+import json
+import tempfile
+from pathlib import Path
+import base64
+from datetime import datetime
+
+from translation_service import TranslationService
+
+app = FastAPI(title="Levi Translation Service")
+
+# Initialize translation service (singleton)
+translation_service = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the translation service on startup."""
+    global translation_service
+    print("🚀 Starting Levi Translation Service...")
+    translation_service = TranslationService()
+    print("✅ Service ready!")
+
+
+@app.get("/")
+async def root():
+    """Health check endpoint."""
+    return {
+        "service": "Levi Translation Service",
+        "status": "running",
+        "version": "0.1.0",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@app.get("/health")
+async def health():
+    """Detailed health check."""
+    return {
+        "status": "healthy",
+        "translation_service": "ready" if translation_service else "not initialized",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@app.websocket("/ws/translate")
+async def websocket_translate(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time translation.
+
+    Protocol:
+    Client sends: {
+        "audio": "<base64-encoded audio data>",
+        "source_lang": "es" | "en",
+        "target_lang": "en" | "es",
+        "format": "wav" | "mp3" | "ogg"
+    }
+
+    Server responds: {
+        "status": "success" | "error",
+        "transcription": "<original text>",
+        "translation": "<translated text>",
+        "audio": "<base64-encoded translated audio>",
+        "latency_ms": <int>,
+        "error": "<error message if status=error>"
+    }
+    """
+    await websocket.accept()
+    print(f"✓ WebSocket client connected from {websocket.client}")
+
+    try:
+        while True:
+            # Receive message
+            data = await websocket.receive_text()
+            request = json.loads(data)
+
+            print(f"\n{'='*60}")
+            print(f"📥 Translation request: {request.get('source_lang')} → {request.get('target_lang')}")
+            start_time = asyncio.get_event_loop().time()
+
+            try:
+                # Decode audio
+                audio_data = base64.b64decode(request["audio"])
+                audio_format = request.get("format", "wav")
+
+                # Save to temp file
+                with tempfile.NamedTemporaryFile(suffix=f".{audio_format}", delete=False) as temp_audio:
+                    temp_audio.write(audio_data)
+                    temp_audio_path = temp_audio.name
+
+                # Process translation
+                result = translation_service.translate_audio(
+                    input_audio=temp_audio_path,
+                    source_lang=request["source_lang"],
+                    target_lang=request["target_lang"]
+                )
+
+                # Read output audio and encode
+                with open(result["output_audio"], "rb") as f:
+                    output_audio_data = f.read()
+                output_audio_b64 = base64.b64encode(output_audio_data).decode('utf-8')
+
+                # Calculate latency
+                latency_ms = int((asyncio.get_event_loop().time() - start_time) * 1000)
+
+                # Send response
+                response = {
+                    "status": "success",
+                    "transcription": result["transcription"],
+                    "translation": result["translation"],
+                    "audio": output_audio_b64,
+                    "latency_ms": latency_ms
+                }
+
+                print(f"✅ Translation completed in {latency_ms}ms")
+                print(f"   Original: {result['transcription'][:50]}...")
+                print(f"   Translated: {result['translation'][:50]}...")
+
+                await websocket.send_text(json.dumps(response))
+
+                # Cleanup temp files
+                Path(temp_audio_path).unlink(missing_ok=True)
+                Path(result["output_audio"]).unlink(missing_ok=True)
+
+            except Exception as e:
+                error_msg = str(e)
+                print(f"❌ Translation error: {error_msg}")
+
+                await websocket.send_text(json.dumps({
+                    "status": "error",
+                    "error": error_msg
+                }))
+
+    except WebSocketDisconnect:
+        print(f"✗ WebSocket client disconnected")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    print("""
+    ╔═══════════════════════════════════════════════════════════╗
+    ║                                                           ║
+    ║               🎙️  LEVI TRANSLATION SERVICE  🌍            ║
+    ║                                                           ║
+    ║  Phase 2: WebSocket Server for Cloud Integration         ║
+    ║                                                           ║
+    ╚═══════════════════════════════════════════════════════════╝
+    """)
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",  # Listen on all interfaces
+        port=8000,
+        log_level="info"
+    )
