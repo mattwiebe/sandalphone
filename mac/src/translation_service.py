@@ -6,13 +6,17 @@ This is the heart of Levi's translation mode.
 import sys
 from pathlib import Path
 import tempfile
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from stt.whisper_client import WhisperClient
 from llm.translation_client import TranslationClient
-from tts.qwen_tts_client import QwenTTSClient
+from tts.factory import create_tts_provider
 
 
 class TranslationService:
@@ -27,7 +31,7 @@ class TranslationService:
         self.translator = TranslationClient()
 
         print("3. Loading TTS...")
-        self.tts = QwenTTSClient()
+        self.tts = create_tts_provider()
 
         print("✓ Translation Service ready!")
 

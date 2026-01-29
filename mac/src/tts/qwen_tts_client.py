@@ -7,6 +7,7 @@ Falls back to macOS 'say' command if model loading fails.
 import subprocess
 import tempfile
 from pathlib import Path
+from tts.base import TTSProvider
 
 try:
     from mlx_audio.tts.utils import load_model
@@ -16,7 +17,7 @@ except ImportError:
     MLX_AUDIO_AVAILABLE = False
 
 
-class QwenTTSClient:
+class QwenTTSClient(TTSProvider):
     def __init__(self, model_path=None):
         """
         Initialize TTS client.
