@@ -2,6 +2,7 @@
 Telegram bot for Levi translation service.
 Receives voice messages, sends to Mac backend, returns translated audio.
 """
+
 import os
 import asyncio
 import json
@@ -16,7 +17,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    filters
+    filters,
 )
 import websockets
 from dotenv import load_dotenv
@@ -26,15 +27,19 @@ load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO'))
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
 )
 logger = logging.getLogger(__name__)
 
 # Configuration
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-MAC_WEBSOCKET_URL = os.getenv('MAC_WEBSOCKET_URL', 'ws://localhost:8000/ws/translate')
-ALLOWED_USER_IDS = os.getenv('ALLOWED_USER_IDS', '').split(',') if os.getenv('ALLOWED_USER_IDS') else []
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+MAC_WEBSOCKET_URL = os.getenv("MAC_WEBSOCKET_URL", "ws://localhost:8000/ws/translate")
+ALLOWED_USER_IDS = (
+    os.getenv("ALLOWED_USER_IDS", "").split(",")
+    if os.getenv("ALLOWED_USER_IDS")
+    else []
+)
 
 # User state management (simple in-memory for now)
 user_states = {}
@@ -67,13 +72,10 @@ Hi {user.first_name}! I can help you translate between Spanish and English.
 Try sending me a voice message! 🎤
     """
 
-    await update.message.reply_text(welcome_message, parse_mode='Markdown')
+    await update.message.reply_text(welcome_message, parse_mode="Markdown")
 
     # Initialize user state
-    user_states[user.id] = {
-        'source_lang': 'es',
-        'target_lang': 'en'
-    }
+    user_states[user.id] = {"source_lang": "es", "target_lang": "en"}
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -103,7 +105,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Need more help? Contact the developer!
     """
-    await update.message.reply_text(help_text, parse_mode='Markdown')
+    await update.message.reply_text(help_text, parse_mode="Markdown")
 
 
 async def toggle_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -112,23 +114,22 @@ async def toggle_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Get or initialize user state
     if user_id not in user_states:
-        user_states[user_id] = {
-            'source_lang': 'es',
-            'target_lang': 'en'
-        }
+        user_states[user_id] = {"source_lang": "es", "target_lang": "en"}
 
     # Toggle mode
     current_state = user_states[user_id]
-    if current_state['source_lang'] == 'es':
-        current_state['source_lang'] = 'en'
-        current_state['target_lang'] = 'es'
-        new_mode = "English → Spanish 🇺🇸 → 🇪🇸"
+    if current_state["source_lang"] == "es":
+        current_state["source_lang"] = "en"
+        current_state["target_lang"] = "es"
+        new_mode = "English → Spanish 🇨🇦 → 🇪🇸"
     else:
-        current_state['source_lang'] = 'es'
-        current_state['target_lang'] = 'en'
-        new_mode = "Spanish → English 🇪🇸 → 🇺🇸"
+        current_state["source_lang"] = "es"
+        current_state["target_lang"] = "en"
+        new_mode = "Spanish → English 🇪🇸 → 🇨🇦"
 
-    await update.message.reply_text(f"Translation mode changed to:\n**{new_mode}**", parse_mode='Markdown')
+    await update.message.reply_text(
+        f"Translation mode changed to:\n**{new_mode}**", parse_mode="Markdown"
+    )
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -140,7 +141,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         status_msg = f"❌ **Service Status: Offline**\n\nCannot reach Mac backend.\nError: {str(e)}"
 
-    await update.message.reply_text(status_msg, parse_mode='Markdown')
+    await update.message.reply_text(status_msg, parse_mode="Markdown")
 
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -151,21 +152,22 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if user is allowed (if whitelist is configured)
     if ALLOWED_USER_IDS and str(user_id) not in ALLOWED_USER_IDS:
         logger.warning(f"Unauthorized access attempt by user {user_id}")
-        await update.message.reply_text("Sorry, you are not authorized to use this bot.")
+        await update.message.reply_text(
+            "Sorry, you are not authorized to use this bot."
+        )
         return
 
     # Get user state
     if user_id not in user_states:
-        user_states[user_id] = {
-            'source_lang': 'es',
-            'target_lang': 'en'
-        }
+        user_states[user_id] = {"source_lang": "es", "target_lang": "en"}
 
     state = user_states[user_id]
-    source_lang = state['source_lang']
-    target_lang = state['target_lang']
+    source_lang = state["source_lang"]
+    target_lang = state["target_lang"]
 
-    logger.info(f"Received voice message from {user.username} ({user_id}), mode: {source_lang}→{target_lang}")
+    logger.info(
+        f"Received voice message from {user.username} ({user_id}), mode: {source_lang}→{target_lang}"
+    )
 
     # Send "processing" message
     processing_msg = await update.message.reply_text(
@@ -184,18 +186,24 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         voice_data.seek(0)
 
         # Encode as base64
-        audio_b64 = base64.b64encode(voice_data.read()).decode('utf-8')
+        audio_b64 = base64.b64encode(voice_data.read()).decode("utf-8")
 
         # Send to Mac backend via WebSocket
         logger.info(f"Connecting to Mac backend at {MAC_WEBSOCKET_URL}")
 
-        async with websockets.connect(MAC_WEBSOCKET_URL, open_timeout=10) as ws:
+        async with websockets.connect(
+            MAC_WEBSOCKET_URL,
+            open_timeout=10,
+            close_timeout=10,
+            ping_timeout=60,  # Keep connection alive for up to 60 seconds
+            ping_interval=20,  # Send ping every 20 seconds
+        ) as ws:
             # Send translation request
             request = {
                 "audio": audio_b64,
                 "source_lang": source_lang,
                 "target_lang": target_lang,
-                "format": "ogg"  # Telegram voice messages are OGG
+                "format": "ogg",  # Telegram voice messages are OGG
             }
 
             await ws.send(json.dumps(request))
@@ -210,27 +218,29 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response_str = await ws.recv()
             response = json.loads(response_str)
 
-        if response['status'] == 'success':
+        if response["status"] == "success":
             # Decode translated audio
-            translated_audio = base64.b64decode(response['audio'])
+            translated_audio = base64.b64decode(response["audio"])
 
             # Send as voice message
             await update.message.reply_voice(
                 voice=BytesIO(translated_audio),
                 caption=f"✅ Translation ({source_lang.upper()}→{target_lang.upper()}):\n\n"
-                        f"**Original:** {response['transcription']}\n\n"
-                        f"**Translation:** {response['translation']}\n\n"
-                        f"⚡ Latency: {response['latency_ms']}ms",
-                parse_mode='Markdown'
+                f"**Original:** {response['transcription']}\n\n"
+                f"**Translation:** {response['translation']}\n\n"
+                f"⚡ Latency: {response['latency_ms']}ms",
+                parse_mode="Markdown",
             )
 
             # Delete processing message
             await processing_msg.delete()
 
-            logger.info(f"Translation successful for user {user_id}, latency: {response['latency_ms']}ms")
+            logger.info(
+                f"Translation successful for user {user_id}, latency: {response['latency_ms']}ms"
+            )
 
         else:
-            error_msg = response.get('error', 'Unknown error')
+            error_msg = response.get("error", "Unknown error")
             await processing_msg.edit_text(f"❌ Translation failed:\n{error_msg}")
             logger.error(f"Translation failed for user {user_id}: {error_msg}")
 
@@ -278,7 +288,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("""
     ╔═══════════════════════════════════════════════════════════╗
     ║                                                           ║

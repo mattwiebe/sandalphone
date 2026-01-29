@@ -51,7 +51,6 @@ class WhisperClient:
             "-m", str(self.model_path),
             "-f", str(audio_path),
             "--no-timestamps",  # Just get the text
-            "--output-txt",  # Output as text
         ]
 
         if language:
@@ -67,15 +66,40 @@ class WhisperClient:
         if result.returncode != 0:
             raise RuntimeError(f"Whisper transcription failed: {result.stderr}")
 
-        # Parse output - whisper-cli writes to stdout
-        # Extract just the transcribed text
-        lines = result.stdout.strip().split('\n')
+        # Parse output - look for lines starting with timestamps or just text
+        # Whisper outputs to stderr, actual transcription is in lines without whisper_ prefix
+        output = result.stderr + result.stdout
+        lines = output.strip().split('\n')
 
-        # Find the transcription line (skipping timing info)
+        # Find the transcription - look for lines with the actual text
         transcription = ""
         for line in lines:
-            if line.strip() and not line.startswith('[') and not line.startswith('whisper_'):
-                transcription = line.strip()
+            line = line.strip()
+
+            # Skip empty lines
+            if not line:
+                continue
+
+            # Skip all system/debug messages
+            skip_prefixes = ['whisper_', 'ggml_', 'system_info:', 'main:', 'operator()', 'Metal', 'CPU', 'OPENVINO', 'COREML']
+            if any(line.startswith(prefix) for prefix in skip_prefixes):
+                continue
+
+            # Skip lines with system info keywords
+            skip_keywords = ['nthreads', 'EMBEDLIBRARY', 'NEON', 'ARMFMA', 'ACCELERATE', 'DOTPROD', 'load time', 'mel time', 'sample time', 'encode time', 'decode time', 'batchd time', 'prompt time', 'total time', 'fallbacks', 'processing']
+            if any(keyword in line for keyword in skip_keywords):
+                continue
+
+            # If it starts with [timestamp], extract the text after ]
+            if line.startswith('[') and ']' in line:
+                # Format: [00:00:00.000 --> 00:00:10.000]  Transcribed text here
+                text_part = line.split(']', 1)[1].strip()
+                if text_part and len(text_part) > 3:  # Must have actual content
+                    transcription = text_part
+                    break
+            # Otherwise, if it looks like transcribed text (not debug info), take it
+            elif len(line) > 3 and not line.startswith('ggml') and not 'time =' in line:
+                transcription = line
                 break
 
         return transcription
