@@ -59,18 +59,13 @@ You can test the bot on your Mac before deploying to the cloud:
 
 ```bash
 cd /Users/matt/levi
-source venv/bin/activate
-
-# Install Telegram bot dependencies
-pip install python-telegram-bot python-dotenv
 
 # Make sure your Mac WebSocket server is running
 # In another terminal:
-python mac/src/main.py
+uv run --extra mac python mac/src/main.py
 
 # Run the Telegram bot
-cd cloud
-python src/telegram_bot.py
+uv run --extra cloud python cloud/src/telegram_bot.py
 ```
 
 Now open Telegram, find your bot, and try:
@@ -94,9 +89,10 @@ Once you're ready to deploy to a VPS:
 1. Provision Hetzner VPS (see `docs/hetzner-setup.md`)
 2. Install Tailscale on VPS
 3. Copy bot code to VPS
-4. Install dependencies: `pip install -r cloud/requirements.txt`
-5. Set up `.env` with your bot token and Mac's Tailscale IP
-6. Run with supervisor/systemd to keep it running
+4. Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+5. Install dependencies: `uv sync --extra cloud`
+6. Set up `.env` with your bot token and Mac's Tailscale IP
+7. Run with supervisor/systemd to keep it running
 
 ## Troubleshooting
 

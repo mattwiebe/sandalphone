@@ -58,8 +58,7 @@ With your WebSocket server still running, you can test locally:
 ```bash
 # Start your Levi server (if not already running)
 cd /Users/matt/levi
-source venv/bin/activate
-python mac/src/main.py
+uv run --extra mac python mac/src/main.py
 
 # Test via Tailscale IP (replace with your actual IP)
 curl http://100.115.92.201:8000/health
