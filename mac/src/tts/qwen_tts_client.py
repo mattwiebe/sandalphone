@@ -1,10 +1,13 @@
 """
-Qwen3-TTS client for text-to-speech synthesis.
+Qwen3-TTS client for text-to-speech synthesis with voice cloning.
 Uses MLX-optimized Qwen3-TTS for low-latency speech generation.
 """
+
 import subprocess
 import tempfile
 from pathlib import Path
+from mlx_audio.tts.utils import load_model
+from mlx_audio.tts.generate import generate_audio
 
 
 class QwenTTSClient:
@@ -16,16 +19,19 @@ class QwenTTSClient:
             model_path: Path to Qwen3-TTS model directory
         """
         if model_path is None:
-            model_path = Path(__file__).parent.parent.parent / "models" / "qwen3-tts-0.6b"
+            model_path = (
+                Path(__file__).parent.parent.parent / "models" / "qwen3-tts-0.6b"
+            )
 
         self.model_path = Path(model_path)
 
         if not self.model_path.exists():
             raise FileNotFoundError(f"TTS model not found: {self.model_path}")
 
-        # Note: Qwen3-TTS requires specific inference code
-        # For now, we'll use a placeholder until we implement the full TTS pipeline
-        print(f"TTS model path: {self.model_path}")
+        # Load the Qwen3-TTS model
+        print(f"Loading TTS model from {self.model_path}...")
+        self.model = load_model(self.model_path)
+        print("TTS model loaded!")
 
     def synthesize(self, text, output_file=None, language="en"):
         """
@@ -39,25 +45,43 @@ class QwenTTSClient:
         Returns:
             Path to generated audio file
         """
-        # TODO: Implement full Qwen3-TTS inference
-        # For now, use system TTS as placeholder
         if output_file is None:
-            output_file = Path(tempfile.mktemp(suffix=".wav"))
+            # Create temp file with proper prefix
+            temp_dir = Path(tempfile.gettempdir())
+            output_file = temp_dir / f"tts_{id(self)}.wav"
         else:
             output_file = Path(output_file)
 
-        # Placeholder: Use macOS 'say' command for testing
-        # This will be replaced with actual Qwen3-TTS inference
-        voice = "Samantha" if language == "en" else "Paulina"
+        # Remove extension from output file for generate_audio
+        # (it adds .wav automatically)
+        file_prefix = str(output_file.parent / output_file.stem)
 
-        cmd = ["say", "-v", voice, "-o", str(output_file), "--data-format=LEI16@16000", text]
+        # Generate audio
+        generate_audio(
+            model=self.model,
+            text=text,
+            file_prefix=file_prefix,
+        )
 
-        result = subprocess.run(cmd, capture_output=True)
+        # generate_audio creates {file_prefix}_000.wav (with segment number)
+        generated_file = Path(f"{file_prefix}_000.wav")
 
-        if result.returncode != 0:
-            raise RuntimeError(f"TTS synthesis failed: {result.stderr.decode()}")
+        if not generated_file.exists():
+            # Also check for .wav without suffix
+            alt_file = Path(f"{file_prefix}.wav")
+            if alt_file.exists():
+                generated_file = alt_file
+            else:
+                raise RuntimeError(
+                    f"TTS synthesis failed: output file not created at {generated_file} or {alt_file}"
+                )
 
-        return output_file
+        # If the desired output file is different, rename it
+        if generated_file != output_file:
+            generated_file.rename(output_file)
+            return output_file
+
+        return generated_file
 
 
 if __name__ == "__main__":

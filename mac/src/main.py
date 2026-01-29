@@ -94,6 +94,21 @@ async def websocket_translate(websocket: WebSocket):
                     temp_audio.write(audio_data)
                     temp_audio_path = temp_audio.name
 
+                # Convert to WAV if needed (Whisper requires WAV)
+                if audio_format != "wav":
+                    import subprocess
+                    wav_path = temp_audio_path.replace(f".{audio_format}", ".wav")
+                    subprocess.run([
+                        "ffmpeg", "-i", temp_audio_path,
+                        "-ar", "16000",  # 16kHz sample rate
+                        "-ac", "1",      # Mono
+                        "-y",            # Overwrite
+                        wav_path
+                    ], capture_output=True, check=True)
+                    # Clean up original file
+                    Path(temp_audio_path).unlink(missing_ok=True)
+                    temp_audio_path = wav_path
+
                 # Process translation
                 result = translation_service.translate_audio(
                     input_audio=temp_audio_path,
