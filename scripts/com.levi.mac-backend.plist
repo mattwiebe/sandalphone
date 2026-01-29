@@ -7,7 +7,13 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/matt/levi/venv/bin/python</string>
+        <string>/opt/homebrew/bin/uv</string>
+        <string>run</string>
+        <string>--project</string>
+        <string>/Users/matt/levi</string>
+        <string>--extra</string>
+        <string>mac</string>
+        <string>python</string>
         <string>-u</string>
         <string>/Users/matt/levi/mac/src/main.py</string>
     </array>

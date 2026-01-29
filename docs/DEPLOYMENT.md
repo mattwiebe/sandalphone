@@ -29,18 +29,15 @@ You can test the entire system on your Mac without any cloud setup:
 ```bash
 # Terminal 1: Start Mac backend
 cd /Users/matt/levi
-source venv/bin/activate
-python mac/src/main.py
+uv run --extra mac python mac/src/main.py
 
 # Terminal 2: Start Telegram bot (after configuring - see below)
 cd /Users/matt/levi
-source venv/bin/activate
-pip install python-telegram-bot python-dotenv
 cd cloud
 cp .env.example .env
 # Edit .env and add your bot token from @BotFather
 # Set MAC_WEBSOCKET_URL=ws://localhost:8000/ws/translate
-python src/telegram_bot.py
+uv run --extra cloud python src/telegram_bot.py
 ```
 
 Now you can send voice messages to your Telegram bot and get translations!
@@ -95,8 +92,7 @@ ALLOWED_USER_IDS=your_telegram_user_id  # Optional, get from @userinfobot
 ```bash
 # Make sure Whisper server is running
 cd /Users/matt/levi
-source venv/bin/activate
-python mac/src/main.py
+uv run --extra mac python mac/src/main.py
 ```
 
 Keep this running! You can use `screen` or `tmux` to keep it alive.
@@ -125,23 +121,26 @@ ssh root@your-vps-ip
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 
-# Install Python and dependencies
+# Install dependencies
 apt update && apt upgrade -y
-apt install -y python3.11 python3-pip git
+apt install -y git curl
+
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone your repo (or copy files)
 git clone https://github.com/yourusername/levi.git
-cd levi/cloud
+cd levi
 
 # Install dependencies
-pip3 install -r requirements.txt
+uv sync --extra cloud
 
 # Configure
 cp .env.example .env
 nano .env  # Add your bot token and Mac's Tailscale IP
 
 # Test
-python3 src/telegram_bot.py
+uv run --extra cloud python cloud/src/telegram_bot.py
 ```
 
 ### Step 6: Keep Bot Running (Production)
@@ -149,7 +148,7 @@ python3 src/telegram_bot.py
 **On Mac (screen/tmux):**
 ```bash
 screen -S levi-mac
-python mac/src/main.py
+uv run --extra mac python mac/src/main.py
 # Press Ctrl+A then D to detach
 ```
 
@@ -163,9 +162,9 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/levi/cloud
-Environment="PATH=/usr/bin:/usr/local/bin"
-ExecStart=/usr/bin/python3 /root/levi/cloud/src/telegram_bot.py
+WorkingDirectory=/root/levi
+Environment="PATH=/root/.local/bin:/usr/bin:/usr/local/bin"
+ExecStart=/root/.local/bin/uv run --extra cloud python /root/levi/cloud/src/telegram_bot.py
 Restart=always
 RestartSec=10
 

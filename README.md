@@ -56,14 +56,17 @@ Planned (Phase 2 - Cloud Integration):
 1. **Clone and setup:**
 ```bash
 cd /Users/matt/levi
-python3 -m venv venv
-source venv/bin/activate
+
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+uv sync --extra mac
 ```
 
-2. **Install dependencies:**
+2. **Install system dependencies:**
 ```bash
-brew install cmake ffmpeg cloudflared
-pip install fastapi uvicorn websockets vllm-mlx
+brew install cmake ffmpeg cloudflared direnv
 ```
 
 3. **Build Whisper.cpp with Metal:**
@@ -88,8 +91,7 @@ cd .. && bash ./models/download-ggml-model.sh base
 
 **Test the translation pipeline:**
 ```bash
-source venv/bin/activate
-python mac/src/translation_service.py
+uv run --extra mac python mac/src/translation_service.py
 ```
 
 This will:
