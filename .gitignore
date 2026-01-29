@@ -71,7 +71,6 @@ temp/
 *.tmp
 
 # uv
-uv.lock
 .python-version
 
 # direnv
