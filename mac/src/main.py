@@ -10,9 +10,13 @@ import tempfile
 from pathlib import Path
 import base64
 from datetime import datetime
+import gc
 
 from translation_service import TranslationService
 from streaming_translation_service import StreamingTranslationService
+from stt.whisper_client import WhisperClient
+from llm.translation_factory import create_translation_client
+from tts.factory import create_tts_provider
 
 app = FastAPI(title="Levi Translation Service")
 
@@ -26,8 +30,20 @@ async def startup_event():
     """Initialize the translation services on startup."""
     global translation_service, streaming_translation_service
     print("🚀 Starting Levi Translation Service...")
-    translation_service = TranslationService()
-    streaming_translation_service = StreamingTranslationService()
+
+    # Load shared components once
+    print("1. Loading Whisper STT...")
+    stt = WhisperClient()
+
+    print("2. Loading Translation LLM...")
+    translator = create_translation_client()
+
+    print("3. Loading TTS...")
+    tts = create_tts_provider()
+
+    # Share components between both services
+    translation_service = TranslationService(stt=stt, translator=translator, tts=tts)
+    streaming_translation_service = StreamingTranslationService(stt=stt, translator=translator, tts=tts)
     print("✅ Service ready!")
 
 
@@ -143,9 +159,21 @@ async def websocket_translate(websocket: WebSocket):
 
                 await websocket.send_text(json.dumps(response))
 
-                # Cleanup temp files
-                Path(temp_audio_path).unlink(missing_ok=True)
-                Path(result["output_audio"]).unlink(missing_ok=True)
+                # Cleanup temp files BEFORE deleting result
+                temp_audio_file = Path(temp_audio_path)
+                output_audio_file = Path(result["output_audio"])
+                temp_audio_file.unlink(missing_ok=True)
+                output_audio_file.unlink(missing_ok=True)
+
+                # Explicitly delete large variables to free memory
+                del audio_data
+                del output_audio_data
+                del output_audio_b64
+                del response
+                del result
+
+                # Force garbage collection after each translation
+                gc.collect()
 
             except Exception as e:
                 error_msg = str(e)
