@@ -6,6 +6,7 @@ Falls back to Qwen TTS if model loading fails.
 import tempfile
 import io
 import wave
+import gc
 from pathlib import Path
 from typing import Optional, Generator
 from tts.base import TTSProvider
@@ -123,9 +124,15 @@ class VibeVoiceClient(TTSProvider):
             # If the desired output file is different, rename it
             if generated_file != output_file:
                 generated_file.rename(output_file)
-                return output_file
+                result_file = output_file
+            else:
+                result_file = generated_file
 
-            return generated_file
+            # Clean up MLX memory
+            mx.metal.clear_cache()
+            gc.collect()
+
+            return result_file
 
         except Exception as e:
             print(f"⚠️  VibeVoice synthesis error: {e}")

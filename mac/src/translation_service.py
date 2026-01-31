@@ -15,25 +15,41 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 from stt.whisper_client import WhisperClient
-from llm.translation_client import TranslationClient
+from llm.translation_factory import create_translation_client
 from tts.factory import create_tts_provider
 
 
 class TranslationService:
-    def __init__(self):
-        """Initialize the full translation pipeline."""
-        print("Initializing Translation Service...")
+    def __init__(self, stt=None, translator=None, tts=None):
+        """
+        Initialize the full translation pipeline.
 
-        print("1. Loading Whisper STT...")
-        self.stt = WhisperClient()
+        Args:
+            stt: Optional pre-initialized WhisperClient (for sharing)
+            translator: Optional pre-initialized translation client (for sharing)
+            tts: Optional pre-initialized TTS provider (for sharing)
+        """
+        if stt and translator and tts:
+            # Use shared components
+            print("Initializing Translation Service (using shared components)...")
+            self.stt = stt
+            self.translator = translator
+            self.tts = tts
+            print("✓ Translation Service ready (shared)!")
+        else:
+            # Initialize new components
+            print("Initializing Translation Service...")
 
-        print("2. Loading Translation LLM...")
-        self.translator = TranslationClient()
+            print("1. Loading Whisper STT...")
+            self.stt = WhisperClient()
 
-        print("3. Loading TTS...")
-        self.tts = create_tts_provider()
+            print("2. Loading Translation LLM...")
+            self.translator = create_translation_client()
 
-        print("✓ Translation Service ready!")
+            print("3. Loading TTS...")
+            self.tts = create_tts_provider()
+
+            print("✓ Translation Service ready!")
 
     def translate_audio(
         self, input_audio, source_lang="es", target_lang="en", output_audio=None

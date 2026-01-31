@@ -910,27 +910,42 @@ wheels = [
 [[package]]
 name = "levi"
 version = "0.2.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "python-dotenv" },
     { name = "websockets" },
 ]
 
 [package.optional-dependencies]
+cli = [
+    { name = "click" },
+    { name = "jinja2" },
+    { name = "pyyaml" },
+    { name = "rich" },
+]
 cloud = [
     { name = "aiohttp" },
     { name = "ffmpeg-python" },
+    { name = "ntgcalls" },
     { name = "pydub" },
+    { name = "pyrogram" },
     { name = "python-telegram-bot" },
+    { name = "tgcrypto" },
+    { name = "webrtcvad" },
 ]
 dev = [
     { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "ruff" },
 ]
 mac = [
     { name = "fastapi" },
     { name = "mlx-audio" },
     { name = "mlx-lm" },
+    { name = "protobuf" },
+    { name = "sentencepiece" },
+    { name = "torch" },
+    { name = "transformers" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "websockets" },
 ]
@@ -938,20 +953,33 @@ mac = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", marker = "extra == 'cloud'", specifier = ">=3.9.0" },
+    { name = "click", marker = "extra == 'cli'", specifier = ">=8.1.0" },
     { name = "fastapi", marker = "extra == 'mac'", specifier = ">=0.115.0" },
     { name = "ffmpeg-python", marker = "extra == 'cloud'", specifier = ">=0.2.0" },
+    { name = "jinja2", marker = "extra == 'cli'", specifier = ">=3.1.0" },
     { name = "mlx-audio", marker = "extra == 'mac'", specifier = ">=0.2.0" },
     { name = "mlx-lm", marker = "extra == 'mac'", specifier = ">=0.19.0" },
+    { name = "ntgcalls", marker = "extra == 'cloud'", specifier = ">=1.0.0" },
+    { name = "protobuf", marker = "extra == 'mac'", specifier = ">=6.33.4" },
     { name = "pydub", marker = "extra == 'cloud'", specifier = ">=0.25.1" },
+    { name = "pyrogram", marker = "extra == 'cloud'", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "python-telegram-bot", marker = "extra == 'cloud'", specifier = ">=21.0" },
+    { name = "pyyaml", marker = "extra == 'cli'", specifier = ">=6.0" },
+    { name = "rich", marker = "extra == 'cli'", specifier = ">=13.7.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
+    { name = "sentencepiece", marker = "extra == 'mac'", specifier = ">=0.2.1" },
+    { name = "tgcrypto", marker = "extra == 'cloud'", specifier = ">=1.2.5" },
+    { name = "torch", marker = "extra == 'mac'", specifier = ">=2.10.0" },
+    { name = "transformers", marker = "extra == 'mac'", specifier = ">=5.0.0" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'mac'", specifier = ">=0.30.0" },
+    { name = "webrtcvad", marker = "extra == 'cloud'", specifier = ">=2.0.10" },
     { name = "websockets", specifier = ">=12.0" },
     { name = "websockets", marker = "extra == 'mac'", specifier = ">=12.0" },
 ]
-provides-extras = ["mac", "cloud", "dev"]
+provides-extras = ["mac", "cloud", "cli", "dev"]
 
 [[package]]
 name = "loguru"
@@ -964,6 +992,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3a/05/a1dae3dffd1116099471c643b8924f5aa6524411dc6c63fdae648c4f1aca/loguru-0.7.3.tar.gz", hash = "sha256:19480589e77d47b8d85b2c827ad95d49bf31b0dcde16593892eb51dd18706eb6", size = 63559, upload-time = "2024-12-06T11:20:56.608Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0c/29/0348de65b8cc732daa3e33e67806420b2ae89bdce2b04af740289c5c6c8c/loguru-0.7.3-py3-none-any.whl", hash = "sha256:31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c", size = 61595, upload-time = "2024-12-06T11:20:54.538Z" },
+]
+
+[[package]]
+name = "markdown-it-py"
+version = "4.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mdurl" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5b/f5/4ec618ed16cc4f8fb3b701563655a69816155e79e24a17b651541804721d/markdown_it_py-4.0.0.tar.gz", hash = "sha256:cb0a2b4aa34f932c007117b194e945bd74e0ec24133ceb5bac59009cda1cb9f3", size = 73070, upload-time = "2025-08-11T12:57:52.854Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/54/e7d793b573f298e1c9013b8c4dade17d481164aa517d1d7148619c2cedbf/markdown_it_py-4.0.0-py3-none-any.whl", hash = "sha256:87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147", size = 87321, upload-time = "2025-08-11T12:57:51.923Z" },
 ]
 
 [[package]]
@@ -1016,6 +1056,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/df/5bd7a48c256faecd1d36edc13133e51397e41b73bb77e1a69deab746ebac/markupsafe-3.0.3-cp314-cp314t-win32.whl", hash = "sha256:915c04ba3851909ce68ccc2b8e2cd691618c4dc4c4232fb7982bca3f41fd8c3d", size = 14819, upload-time = "2025-09-27T18:37:26.285Z" },
     { url = "https://files.pythonhosted.org/packages/1a/8a/0402ba61a2f16038b48b39bccca271134be00c5c9f0f623208399333c448/markupsafe-3.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4faffd047e07c38848ce017e8725090413cd80cbc23d86e55c587bf979e579c9", size = 15426, upload-time = "2025-09-27T18:37:27.316Z" },
     { url = "https://files.pythonhosted.org/packages/70/bc/6f1c2f612465f5fa89b95bead1f44dcb607670fd42891d8fdcd5d039f4f4/markupsafe-3.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:32001d6a8fc98c8cb5c947787c5d08b0a50663d139f1305bac5885d98d9b40fa", size = 14146, upload-time = "2025-09-27T18:37:28.327Z" },
+]
+
+[[package]]
+name = "mdurl"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
 ]
 
 [[package]]
@@ -1329,6 +1378,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be9d2e4f1158eb633317598cfa6e1fc14af5383f17512/networkx-3.6.1.tar.gz", hash = "sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509", size = 2517025, upload-time = "2025-12-08T17:02:39.908Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl", hash = "sha256:d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762", size = 2068504, upload-time = "2025-12-08T17:02:38.159Z" },
+]
+
+[[package]]
+name = "ntgcalls"
+version = "2.0.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/be/03/f70a1662c1c92309169346b3f5cb1ec12a771a3572e4809e4b380daa2a83/ntgcalls-2.0.7.tar.gz", hash = "sha256:eb827925d16dd9d8ff91e755d7175691357ed0951cca6ab874b91d3d78ea4ba9", size = 9165340, upload-time = "2026-01-20T15:58:35.476Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/57/1bf4678b56a18c29cd26559bcfaf24a2cb0a0b84d2827ab72ad32cca7f6c/ntgcalls-2.0.7-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:abaefeb9e0fcc2a6ea1d59122acba1b281214eb11ac31c3660ace0fc6304f46f", size = 10450697, upload-time = "2026-01-20T15:58:09.398Z" },
+    { url = "https://files.pythonhosted.org/packages/df/be/9182ffab0c2b5301277eda5aa4fd349ce70690c09b57c2d0bf9f4a1139da/ntgcalls-2.0.7-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:a10d2ee65dca5b1ea918b6e1b78f4ea64c391d3272f4e0d03f6332169185227b", size = 40391357, upload-time = "2026-01-20T15:58:12.846Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/5b/e945605bc8b05b5c0315bd3be2b7f7002c4d9a1b5380955406c786735211/ntgcalls-2.0.7-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:461b8bd08241601aef678d5a7da934b87dfb174074f6e46212c26703fe8de966", size = 37701474, upload-time = "2026-01-20T15:58:16.135Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/d6/a2f210040d18a69142bb224659853742f2bc9714171efab830872f9dfb79/ntgcalls-2.0.7-cp313-cp313-win_amd64.whl", hash = "sha256:f8f80e0a391cd03d265dc66e12f0357948a3b7996ca4bf06ec87c42e79b450ee", size = 10618613, upload-time = "2026-01-20T15:58:19.228Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/c8/f44b52aa4a819ec986c6a85811df1718b89df66b090660f232bbb51dce9c/ntgcalls-2.0.7-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:1c8b7b5598644117d1cb2abef8d22692f55241f028e4891f46e5771a1885e0d2", size = 10451361, upload-time = "2026-01-20T15:58:21.314Z" },
+    { url = "https://files.pythonhosted.org/packages/41/a8/83a6e4c9994260fd62baa0cf994c563bbfb829808997b7d6e999d18154eb/ntgcalls-2.0.7-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:6b13349e2a1518893af0ffaae2d7ce9503830a3623ac0011338aa5b49ee00340", size = 40388522, upload-time = "2026-01-20T15:58:24.226Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/60/9e52fca00b9cac5b3d99e3490f092b643c1174f5f710b632e7508d6783e5/ntgcalls-2.0.7-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:7f899c18086dd0ce2c31e5cd1fbed52400fb9d31864d67e77e65de89b34a00e0", size = 37700558, upload-time = "2026-01-20T15:58:27.462Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/8f/80727e6516f2a6e0b84b5ba0dfd86f4015ce0bf305bf60765a1ca9575078/ntgcalls-2.0.7-cp314-cp314-win_amd64.whl", hash = "sha256:9d42e4d135c1d38350d2d340bd109bed023dbe619d1c04f1f753efce37d0e4c5", size = 10918382, upload-time = "2026-01-20T15:58:33.439Z" },
 ]
 
 [[package]]
@@ -1815,6 +1880,12 @@ wheels = [
 ]
 
 [[package]]
+name = "pyaes"
+version = "1.6.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/66/2c17bae31c906613795711fc78045c285048168919ace2220daa372c7d72/pyaes-1.6.1.tar.gz", hash = "sha256:02c1b1405c38d3c370b085fb952dd8bea3fadcee6411ad99f312cc129c536d8f", size = 28536, upload-time = "2017-09-20T21:17:54.23Z" }
+
+[[package]]
 name = "pyarrow"
 version = "23.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1992,6 +2063,28 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f3/91/9c6ee907786a473bf81c5f53cf703ba0957b23ab84c264080fb5a450416f/pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc", size = 6851574, upload-time = "2026-01-21T03:57:59.36Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
+]
+
+[[package]]
+name = "pyrogram"
+version = "2.0.106"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyaes" },
+    { name = "pysocks" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c8/8e/5d09eca17271320bb9a95e50b7e053770aee85b3fd338e8267e7b6b280ae/Pyrogram-2.0.106.tar.gz", hash = "sha256:30202995758fcb6e0f91224704ab7fedefea454297724bd70a6a71a23748c16f", size = 345997, upload-time = "2023-04-30T18:24:45.506Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/88/502ec24914d208e06baa6f27ff812f46815bb4f302018ad848ebf518abdf/Pyrogram-2.0.106-py3-none-any.whl", hash = "sha256:32b62b3d93030b1080cbe45b88c0e8790cf4e2179cf3321ede810d48edf97bc7", size = 3573685, upload-time = "2023-04-30T18:24:41.986Z" },
+]
+
+[[package]]
+name = "pysocks"
+version = "1.7.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/bd/11/293dd436aea955d45fc4e8a35b6ae7270f5b8e00b53cf6c024c83b657a11/PySocks-1.7.1.tar.gz", hash = "sha256:3f8804571ebe159c380ac6de37643bb4685970655d3bba243530d6558b799aa0", size = 284429, upload-time = "2019-09-20T02:07:35.714Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/59/b4572118e098ac8e46e399a1dd0f2d85403ce8bbaad9ec79373ed6badaf9/PySocks-1.7.1-py3-none-any.whl", hash = "sha256:2725bd0a9925919b9b51739eea5f9e2bae91e83288108a9ad338b2e3a4435ee5", size = 16725, upload-time = "2019-09-20T02:06:22.938Z" },
 ]
 
 [[package]]
@@ -2211,6 +2304,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/79/30/5b1b6c28c105629cc12b33bdcbb0b11b5bb1880c6cfbd955f9e792921aa8/rfc3986-1.5.0.tar.gz", hash = "sha256:270aaf10d87d0d4e095063c65bf3ddbc6ee3d0b226328ce21e036f946e421835", size = 49378, upload-time = "2021-05-07T23:29:27.183Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c4/e5/63ca2c4edf4e00657584608bee1001302bbf8c5f569340b78304f2f446cb/rfc3986-1.5.0-py2.py3-none-any.whl", hash = "sha256:a86d6e1f5b1dc238b218b012df0aa79409667bb209e58da56d0b94704e712a97", size = 31976, upload-time = "2021-05-07T23:29:25.611Z" },
+]
+
+[[package]]
+name = "rich"
+version = "14.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py" },
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a1/84/4831f881aa6ff3c976f6d6809b58cdfa350593ffc0dc3c58f5f6586780fb/rich-14.3.1.tar.gz", hash = "sha256:b8c5f568a3a749f9290ec6bddedf835cec33696bfc1e48bcfecb276c7386e4b8", size = 230125, upload-time = "2026-01-24T21:40:44.847Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/2a/a1810c8627b9ec8c57ec5ec325d306701ae7be50235e8fd81266e002a3cc/rich-14.3.1-py3-none-any.whl", hash = "sha256:da750b1aebbff0b372557426fb3f35ba56de8ef954b3190315eb64076d6fb54e", size = 309952, upload-time = "2026-01-24T21:40:42.969Z" },
 ]
 
 [[package]]
@@ -2666,6 +2772,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/46/79/cf31d7a93a8fdc6aa
 wheels = [
     { url = "https://files.pythonhosted.org/packages/33/d1/8bb87d21e9aeb323cc03034f5eaf2c8f69841e40e4853c2627edf8111ed3/termcolor-3.3.0-py3-none-any.whl", hash = "sha256:cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5", size = 7734, upload-time = "2025-12-29T12:55:20.718Z" },
 ]
+
+[[package]]
+name = "tgcrypto"
+version = "1.2.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/33/59/7cf5ced989e3139a791d5452d58cb8994de589576b80f9267ba76d794f6c/TgCrypto-1.2.5.tar.gz", hash = "sha256:9bc2cac6fb9a12ef5b08f3dd500174fe374d89b660cce981f57e3138559cb682", size = 37280, upload-time = "2022-11-11T19:55:11.436Z" }
 
 [[package]]
 name = "thinc"
