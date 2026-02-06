@@ -4,6 +4,12 @@ export interface AppConfig {
   readonly logLevel: "debug" | "info" | "warn" | "error";
   readonly asteriskSharedSecret?: string;
   readonly pipelineMinFrameIntervalMs: number;
+  readonly assemblyAiApiKey?: string;
+  readonly assemblyAiRealtimeUrl?: string;
+  readonly googleTranslateApiKey?: string;
+  readonly awsRegion: string;
+  readonly pollyVoiceEn: string;
+  readonly pollyVoiceEs: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -27,5 +33,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     logLevel,
     asteriskSharedSecret: env.ASTERISK_SHARED_SECRET,
     pipelineMinFrameIntervalMs,
+    assemblyAiApiKey: env.ASSEMBLYAI_API_KEY,
+    assemblyAiRealtimeUrl: env.ASSEMBLYAI_REALTIME_URL,
+    googleTranslateApiKey: env.GOOGLE_TRANSLATE_API_KEY,
+    awsRegion: env.AWS_REGION ?? "us-west-2",
+    pollyVoiceEn: env.POLLY_VOICE_EN ?? "Joanna",
+    pollyVoiceEs: env.POLLY_VOICE_ES ?? "Lupe",
   };
 }
