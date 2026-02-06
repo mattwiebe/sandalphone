@@ -16,6 +16,7 @@
     "test:smoke": "tsx --test src/__tests__/smoke-http.test.ts",
     "test:quick": "npm run check && npm run test:smoke",
     "smoke:live": "node ./scripts/smoke-live.mjs",
+    "deploy:preflight": "node ./scripts/deploy-preflight.mjs",
     "docker:build": "docker compose build",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down"
