@@ -31,12 +31,28 @@ Primary operator surface:
 sandalphone help
 ```
 
+If `sandalphone` is not found after build:
+
+```bash
+cd /Users/matt/levi/vps-gateway
+npm link
+```
+
+Equivalent local invocation (no global link needed):
+
+```bash
+node dist/cli.js help
+node dist/cli.js install
+node dist/cli.js --version
+```
+
 Core commands:
 
 ```bash
 sandalphone build
 sandalphone check
 sandalphone install
+sandalphone --version
 sandalphone funnel up --port 8080
 sandalphone funnel status
 sandalphone funnel reset --clear-env
