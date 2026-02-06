@@ -45,6 +45,8 @@ Recommended env:
 - `AWS_SECRET_ACCESS_KEY`
 - `OPENCLAW_BRIDGE_URL` (if you want OpenClaw integration)
 
+If you do not have API keys yet, the installer prints a short guide with links to get them.
+
 Example:
 
 ```bash

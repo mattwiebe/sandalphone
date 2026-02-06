@@ -38,6 +38,28 @@ log() {
   echo "[sandalphone] $*"
 }
 
+print_api_key_guide() {
+  cat <<'EOF'
+[sandalphone] API keys are optional for install, but required for real translation.
+
+STT (AssemblyAI):
+  - Create an account, then generate an API key.
+  - Docs: https://www.assemblyai.com/docs
+
+Translation (Google Cloud Translate v2):
+  - Create a Google Cloud project and enable "Cloud Translation API".
+  - Create an API key restricted to Translation API.
+  - Docs: https://cloud.google.com/translate/docs/basic/quickstart
+
+TTS (AWS Polly Standard):
+  - Create an IAM user with Polly permissions.
+  - Create access key + secret key.
+  - Docs: https://docs.aws.amazon.com/polly/latest/dg/setting-up.html
+
+You can re-run this installer later with keys, or edit /opt/sandalphone/vps-gateway/.env directly.
+EOF
+}
+
 prompt_required() {
   local name="$1"
   local label="$2"
@@ -205,6 +227,8 @@ health_check() {
 }
 
 prompt_required OUTBOUND_TARGET_E164 "Outbound target phone (E.164)"
+
+print_api_key_guide
 
 ensure_deps
 ensure_node
