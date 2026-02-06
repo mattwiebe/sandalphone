@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyEnvUpdates, parseEnvFile } from "../cli-env-file.js";
+import { applyEnvUpdates, parseEnvFile, removeEnvKeys } from "../cli-env-file.js";
 
 test("parseEnvFile reads plain and quoted values", () => {
   const parsed = parseEnvFile([
@@ -36,4 +36,15 @@ test("applyEnvUpdates quotes values with spaces", () => {
     out,
     'PUBLIC_BASE_URL="https://voice.example.com/path with space"',
   );
+});
+
+test("removeEnvKeys removes legacy keys while keeping comments", () => {
+  const out = removeEnvKeys(
+    ["OUTBOUND_TARGET_E164=+111", "DESTINATION_PHONE_E164=+222", "# keep", ""].join("\n"),
+    ["DESTINATION_PHONE_E164"],
+  );
+
+  assert.equal(out.includes("DESTINATION_PHONE_E164"), false);
+  assert.equal(out.includes("OUTBOUND_TARGET_E164=+111"), true);
+  assert.equal(out.includes("# keep"), true);
 });

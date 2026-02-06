@@ -62,6 +62,12 @@ sandalphone test quick
 sandalphone smoke live --base-url https://voice.yourdomain.com
 sandalphone doctor deploy
 sandalphone service print-unit
+sandalphone service print-launchd
+sandalphone service install-launchd
+sandalphone service launchd-load
+sandalphone service launchd-status
+sandalphone service launchd-logs --lines 200
+sandalphone service launchd-unload
 sandalphone service status
 sandalphone service logs --lines 200
 ```
@@ -265,4 +271,29 @@ To write to a non-default env file:
 
 ```bash
 sandalphone install --env-path /path/to/.env
+```
+
+## macOS Background Service (launchd)
+Run as a user agent on macOS without Docker:
+
+```bash
+sandalphone service install-launchd
+sandalphone service launchd-load
+sandalphone service launchd-status
+sandalphone service launchd-logs --lines 200
+```
+
+Defaults:
+- Label: `com.sandalphone.vps-gateway`
+- Plist path: `~/Library/LaunchAgents/com.sandalphone.vps-gateway.plist`
+- Logs: `/tmp/sandalphone-vps-gateway.out.log`, `/tmp/sandalphone-vps-gateway.err.log`
+
+Override example:
+
+```bash
+sandalphone service install-launchd \
+  --label com.sandalphone.gateway.dev \
+  --env-path .env \
+  --stdout-log /tmp/sandalphone-dev.out.log \
+  --stderr-log /tmp/sandalphone-dev.err.log
 ```

@@ -6,7 +6,8 @@ import { randomBytes } from "node:crypto";
 import { createInterface } from "node:readline/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyEnvUpdates, parseEnvFile, type EnvMap } from "./cli-env-file.js";
+import { homedir, platform } from "node:os";
+import { applyEnvUpdates, parseEnvFile, removeEnvKeys, type EnvMap } from "./cli-env-file.js";
 import { extractFunnelUrl, extractFunnelUrlFromText } from "./cli-funnel.js";
 
 type Dict = Record<string, string | undefined>;
@@ -215,7 +216,9 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       }),
     };
 
-    const mergedText = applyEnvUpdates(currentText, updates);
+    const mergedText = removeEnvKeys(applyEnvUpdates(currentText, updates), [
+      "DESTINATION_PHONE_E164",
+    ]);
     writeFileSync(envPath, mergedText.endsWith("\n") ? mergedText : `${mergedText}\n`, "utf8");
 
     const publicBaseUrl = updates.PUBLIC_BASE_URL;
@@ -433,7 +436,7 @@ function updateEnvFile(envPath: string, updates: EnvMap, projectRoot: string): v
       ? readFileSync(templatePath, "utf8")
       : "";
 
-  const merged = applyEnvUpdates(sourceText, updates);
+  const merged = removeEnvKeys(applyEnvUpdates(sourceText, updates), ["DESTINATION_PHONE_E164"]);
   writeFileSync(envPath, merged.endsWith("\n") ? merged : `${merged}\n`, "utf8");
 }
 
@@ -569,6 +572,99 @@ function handleService(args: string[], context: CliContext): void {
     return;
   }
 
+  if (action === "print-launchd") {
+    assertDarwin("print-launchd");
+    const { flags } = parseFlags(args.slice(1));
+    process.stdout.write(
+      renderLaunchdPlist({
+        label: flags.label ?? "com.sandalphone.vps-gateway",
+        workdir: resolve(context.projectRoot),
+        envFile: resolve(context.projectRoot, flags["env-path"] ?? ".env"),
+        nodeBin: flags["node-bin"] ?? "node",
+        stdoutLog: flags["stdout-log"] ?? "/tmp/sandalphone-vps-gateway.out.log",
+        stderrLog: flags["stderr-log"] ?? "/tmp/sandalphone-vps-gateway.err.log",
+      }),
+    );
+    return;
+  }
+
+  if (action === "install-launchd") {
+    assertDarwin("install-launchd");
+    const { flags } = parseFlags(args.slice(1));
+    const label = flags.label ?? "com.sandalphone.vps-gateway";
+    const output = expandHomePath(
+      flags.output ?? `~/Library/LaunchAgents/${label}.plist`,
+    );
+    const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+    const plist = renderLaunchdPlist({
+      label,
+      workdir: resolve(context.projectRoot),
+      envFile: envPath,
+      nodeBin: flags["node-bin"] ?? "node",
+      stdoutLog: flags["stdout-log"] ?? "/tmp/sandalphone-vps-gateway.out.log",
+      stderrLog: flags["stderr-log"] ?? "/tmp/sandalphone-vps-gateway.err.log",
+    });
+
+    mkdirSync(dirname(output), { recursive: true });
+    writeFileSync(output, plist, "utf8");
+    process.stdout.write(`[sandalphone] installed launchd plist -> ${output}\n`);
+    process.stdout.write(`[sandalphone] load with: sandalphone service launchd-load --label ${label} --plist ${output}\n`);
+    return;
+  }
+
+  if (action === "launchd-load") {
+    assertDarwin("launchd-load");
+    const { flags } = parseFlags(args.slice(1));
+    const label = flags.label ?? "com.sandalphone.vps-gateway";
+    const plist = expandHomePath(
+      flags.plist ?? `~/Library/LaunchAgents/${label}.plist`,
+    );
+    const domain = launchdDomain();
+
+    runCommand("launchctl", ["bootout", domain, plist], { allowNonZeroExit: true });
+    runCommand("launchctl", ["bootstrap", domain, plist]);
+    runCommand("launchctl", ["enable", `${domain}/${label}`]);
+    runCommand("launchctl", ["kickstart", "-k", `${domain}/${label}`]);
+    process.stdout.write(`[sandalphone] launchd loaded: ${domain}/${label}\n`);
+    return;
+  }
+
+  if (action === "launchd-unload") {
+    assertDarwin("launchd-unload");
+    const { flags } = parseFlags(args.slice(1));
+    const label = flags.label ?? "com.sandalphone.vps-gateway";
+    const plist = expandHomePath(
+      flags.plist ?? `~/Library/LaunchAgents/${label}.plist`,
+    );
+    const domain = launchdDomain();
+
+    runCommand("launchctl", ["disable", `${domain}/${label}`], { allowNonZeroExit: true });
+    runCommand("launchctl", ["bootout", domain, plist], { allowNonZeroExit: true });
+    process.stdout.write(`[sandalphone] launchd unloaded: ${domain}/${label}\n`);
+    return;
+  }
+
+  if (action === "launchd-status") {
+    assertDarwin("launchd-status");
+    const { flags } = parseFlags(args.slice(1));
+    const label = flags.label ?? "com.sandalphone.vps-gateway";
+    runCommand("launchctl", ["print", `${launchdDomain()}/${label}`]);
+    return;
+  }
+
+  if (action === "launchd-logs") {
+    assertDarwin("launchd-logs");
+    const { flags } = parseFlags(args.slice(1));
+    const outPath = flags["stdout-log"] ?? "/tmp/sandalphone-vps-gateway.out.log";
+    const errPath = flags["stderr-log"] ?? "/tmp/sandalphone-vps-gateway.err.log";
+    process.stdout.write(`[sandalphone] stdout log: ${outPath}\n`);
+    process.stdout.write(`[sandalphone] stderr log: ${errPath}\n`);
+    runCommand("tail", ["-n", flags.lines ?? "200", outPath, errPath], {
+      allowNonZeroExit: true,
+    });
+    return;
+  }
+
   if (action === "reload") {
     runCommand("systemctl", ["daemon-reload"]);
     return;
@@ -642,7 +738,7 @@ function runNodeScript(scriptRelativePath: string, context: CliContext, env: Dic
 function runCommand(
   command: string,
   args: string[],
-  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv; allowNonZeroExit?: boolean } = {},
 ): void {
   const result = spawnSync(command, args, {
     cwd: opts.cwd,
@@ -654,7 +750,9 @@ function runCommand(
     die(`failed to run ${command}: ${result.error.message}`);
   }
 
-  process.exit(result.status ?? 1);
+  if (!opts.allowNonZeroExit) {
+    process.exit(result.status ?? 1);
+  }
 }
 
 function runCommandCapture(
@@ -705,6 +803,58 @@ function looksLikeTailscaleFailure(output: string): boolean {
   );
 }
 
+function assertDarwin(action: string): void {
+  if (platform() !== "darwin") {
+    die(`service ${action} is only available on macOS`);
+  }
+}
+
+function launchdDomain(): string {
+  const uid = typeof process.getuid === "function" ? String(process.getuid()) : "";
+  if (!uid) {
+    die("unable to determine current uid for launchd domain");
+  }
+  return `gui/${uid}`;
+}
+
+function expandHomePath(input: string): string {
+  if (input === "~") return homedir();
+  if (input.startsWith("~/")) return resolve(homedir(), input.slice(2));
+  return resolve(input);
+}
+
+function xmlEscape(input: string): string {
+  return input
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function renderLaunchdPlist(values: {
+  label: string;
+  workdir: string;
+  envFile: string;
+  nodeBin: string;
+  stdoutLog: string;
+  stderrLog: string;
+}): string {
+  const templatePath = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "deploy/launchd/com.sandalphone.vps-gateway.plist",
+  );
+  const template = readFileSync(templatePath, "utf8");
+  return template
+    .replaceAll("__LABEL__", xmlEscape(values.label))
+    .replaceAll("__WORKDIR__", xmlEscape(values.workdir))
+    .replaceAll("__ENV_FILE__", xmlEscape(values.envFile))
+    .replaceAll("__NODE_BIN__", xmlEscape(values.nodeBin))
+    .replaceAll("__STDOUT_LOG__", xmlEscape(values.stdoutLog))
+    .replaceAll("__STDERR_LOG__", xmlEscape(values.stderrLog));
+}
+
 
 function die(message: string): never {
   process.stderr.write(`[sandalphone] ${message}\n`);
@@ -741,6 +891,12 @@ function printFunnelHelp(): void {
 
 function printServiceHelp(): void {
   process.stdout.write(`Service actions:\n`);
+  process.stdout.write(`  sandalphone service print-launchd [--label LABEL] [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone service install-launchd [--label LABEL] [--output ~/Library/LaunchAgents/..plist]\n`);
+  process.stdout.write(`  sandalphone service launchd-load [--label LABEL] [--plist ~/Library/LaunchAgents/..plist]\n`);
+  process.stdout.write(`  sandalphone service launchd-unload [--label LABEL] [--plist ~/Library/LaunchAgents/..plist]\n`);
+  process.stdout.write(`  sandalphone service launchd-status [--label LABEL]\n`);
+  process.stdout.write(`  sandalphone service launchd-logs [--lines N] [--stdout-log PATH] [--stderr-log PATH]\n`);
   process.stdout.write(`  sandalphone service print-unit\n`);
   process.stdout.write(`  sandalphone service install-unit [--output PATH]\n`);
   process.stdout.write(`  sandalphone service reload\n`);

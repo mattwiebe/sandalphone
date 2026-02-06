@@ -40,6 +40,18 @@ export function applyEnvUpdates(baseText: string, updates: EnvMap): string {
   return rewritten.join("\n");
 }
 
+export function removeEnvKeys(baseText: string, keys: string[]): string {
+  if (keys.length === 0) return baseText;
+  const blocked = new Set(keys);
+  const lines = baseText.split(/\r?\n/);
+  const kept = lines.filter((line) => {
+    const match = line.match(KEY_PATTERN);
+    if (!match) return true;
+    return !blocked.has(match[1]);
+  });
+  return kept.join("\n");
+}
+
 function parseValue(raw: string): string {
   const trimmed = raw.trim();
   if (
