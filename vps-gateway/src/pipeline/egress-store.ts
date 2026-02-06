@@ -1,17 +1,28 @@
 import type { TtsChunk } from "../domain/types.js";
 
+export type EgressEnqueueResult = {
+  readonly queueSize: number;
+  readonly droppedOldest: boolean;
+};
+
 export class EgressStore {
   private readonly queues = new Map<string, TtsChunk[]>();
 
   public constructor(private readonly maxQueuePerSession: number) {}
 
-  public enqueue(chunk: TtsChunk): void {
+  public enqueue(chunk: TtsChunk): EgressEnqueueResult {
     const queue = this.queues.get(chunk.sessionId) ?? [];
+    let droppedOldest = false;
     queue.push(chunk);
     if (queue.length > this.maxQueuePerSession) {
       queue.shift();
+      droppedOldest = true;
     }
     this.queues.set(chunk.sessionId, queue);
+    return {
+      queueSize: queue.length,
+      droppedOldest,
+    };
   }
 
   public dequeue(sessionId: string): TtsChunk | undefined {

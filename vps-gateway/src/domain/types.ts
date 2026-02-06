@@ -65,6 +65,11 @@ export interface SessionMetrics {
   readonly translationLatencyMs?: number;
   readonly ttsLatencyMs?: number;
   readonly pipelineLatencyMs?: number;
+  readonly droppedFrames?: number;
+  readonly passthroughFrames?: number;
+  readonly translatedChunks?: number;
+  readonly egressQueuePeak?: number;
+  readonly egressDropCount?: number;
 }
 
 export interface SessionControlUpdate {

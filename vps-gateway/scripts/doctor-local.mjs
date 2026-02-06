@@ -43,6 +43,22 @@ function runCapture(command, args) {
   };
 }
 
+async function checkHttpHealth(url, timeoutMs = 1200) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 if (!existsSync(envPath)) {
   failures.push(`missing env file: ${envPath}`);
 }
@@ -65,6 +81,17 @@ if (env.TWILIO_AUTH_TOKEN && !publicBaseUrl) {
 }
 if (!env.CONTROL_API_SECRET) {
   warnings.push("CONTROL_API_SECRET is not set; /sessions/control and /openclaw/command are unauthenticated");
+}
+if (env.OPENCLAW_BRIDGE_URL) {
+  try {
+    const healthUrl = `${new URL(env.OPENCLAW_BRIDGE_URL).origin}/health`;
+    const ok = await checkHttpHealth(healthUrl);
+    if (!ok) {
+      warnings.push(`OPENCLAW_BRIDGE_URL health check failed: ${healthUrl}`);
+    }
+  } catch {
+    warnings.push("OPENCLAW_BRIDGE_URL is not a valid URL");
+  }
 }
 
 const tailscaleVersion = runCapture("tailscale", ["version"]);

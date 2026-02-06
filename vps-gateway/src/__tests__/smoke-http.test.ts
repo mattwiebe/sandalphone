@@ -62,6 +62,7 @@ type RunningApp = {
 async function startSmokeApp(): Promise<RunningApp> {
   const logger = makeLogger("error");
   const egressStore = new EgressStore(16);
+  let orchestratorRef: VoiceOrchestrator | undefined;
   const orchestrator = new VoiceOrchestrator({
     logger,
     sessionStore: new SessionStore(),
@@ -69,8 +70,12 @@ async function startSmokeApp(): Promise<RunningApp> {
     translator: new SmokeTranslator(),
     tts: new SmokeTts(),
     outboundTargetE164: "+15555550100",
-    onTtsChunk: (chunk) => egressStore.enqueue(chunk),
+    onTtsChunk: (chunk) => {
+      const enqueue = egressStore.enqueue(chunk);
+      orchestratorRef?.reportEgressStats(chunk.sessionId, enqueue);
+    },
   });
+  orchestratorRef = orchestrator;
 
   const eventSink: Array<Record<string, unknown>> = [];
   const bridgeReceiver = createServer(async (req, res) => {
@@ -204,6 +209,19 @@ test("smoke: asterisk inbound/media/egress/end lifecycle", async () => {
     };
     const ended = sessionsPayload.sessions.find((s) => s.id === egressPayload.sessionId);
     assert.equal(ended?.state, "ended");
+
+    const debug = await fetch(
+      `${app.baseUrl}/sessions/${encodeURIComponent(egressPayload.sessionId)}/debug`,
+      {
+        headers: { "x-control-secret": "controlsecret" },
+      },
+    );
+    assert.equal(debug.status, 200);
+    const debugPayload = (await debug.json()) as {
+      metrics?: { egressQueuePeak?: number; translatedChunks?: number };
+    };
+    assert.equal((debugPayload.metrics?.egressQueuePeak ?? 0) >= 1, true);
+    assert.equal((debugPayload.metrics?.translatedChunks ?? 0) >= 1, true);
   } finally {
     await app.stop();
   }
@@ -279,8 +297,26 @@ test("smoke: openclaw command endpoint relays command", async () => {
     });
 
     assert.equal(response.status, 202);
+    await waitFor(() => app.eventSink.some((event) => event.type === "command"), 1000);
     assert.ok(app.eventSink.some((event) => event.type === "command"));
   } finally {
     await app.stop();
   }
 });
+
+function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const interval = setInterval(() => {
+      if (predicate()) {
+        clearInterval(interval);
+        resolve();
+        return;
+      }
+      if (Date.now() - started > timeoutMs) {
+        clearInterval(interval);
+        reject(new Error("timeout waiting for condition"));
+      }
+    }, 25);
+  });
+}
