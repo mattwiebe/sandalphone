@@ -20,7 +20,9 @@ function main(): void {
     destination phoneE164: config.destination phoneE164,
   });
 
-  const server = startHttpServer(config.port, logger, orchestrator);
+  const server = startHttpServer(config.port, logger, orchestrator, {
+    asteriskSharedSecret: config.asteriskSharedSecret,
+  });
 
   const shutdown = (signal: NodeJS.Signals): void => {
     logger.info("shutdown signal received", { signal });

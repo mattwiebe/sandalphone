@@ -118,3 +118,4 @@ It returns TwiML that immediately dials the configured destination phone E.164 t
 - `PORT` (default `8080`)
 - `DESTINATION_PHONE_E164` (default `+15555550100`)
 - `LOG_LEVEL` (default `info`)
+- `ASTERISK_SHARED_SECRET` (recommended on public VPS; required as `x-asterisk-secret` header for `/asterisk/inbound` and `/asterisk/media` when set)
