@@ -1,6 +1,7 @@
 import { loadConfig } from "./config.js";
 import { SessionStore } from "./pipeline/session-store.js";
 import { VoiceOrchestrator } from "./pipeline/orchestrator.js";
+import { EgressStore } from "./pipeline/egress-store.js";
 import { makeProviders } from "./providers/factory.js";
 import { makeLogger } from "./server/logger.js";
 import { startHttpServer } from "./server/http.js";
@@ -9,6 +10,7 @@ function main(): void {
   const config = loadConfig(process.env);
   const logger = makeLogger(config.logLevel);
   const providers = makeProviders(config, logger);
+  const egressStore = new EgressStore(config.egressMaxQueuePerSession);
 
   const orchestrator = new VoiceOrchestrator({
     logger,
@@ -18,10 +20,12 @@ function main(): void {
     tts: providers.tts,
     destination phoneE164: config.destination phoneE164,
     minFrameIntervalMs: config.pipelineMinFrameIntervalMs,
+    onTtsChunk: (chunk) => egressStore.enqueue(chunk),
   });
 
   const server = startHttpServer(config.port, logger, orchestrator, {
     asteriskSharedSecret: config.asteriskSharedSecret,
+    egressStore,
   });
 
   const shutdown = (signal: NodeJS.Signals): void => {

@@ -13,6 +13,7 @@ import {
 import { wireTwilioMediaSocket } from "../ingress/twilio-media-stream.js";
 import { hasValidAsteriskSecret } from "./auth.js";
 import type { Logger } from "./logger.js";
+import type { EgressStore } from "../pipeline/egress-store.js";
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
@@ -47,7 +48,7 @@ export function startHttpServer(
   port: number,
   logger: Logger,
   orchestrator: VoiceOrchestrator,
-  opts: { readonly asteriskSharedSecret?: string } = {},
+  opts: { readonly asteriskSharedSecret?: string; readonly egressStore: EgressStore },
 ): Server {
   const twilioWs = new WebSocketServer({ noServer: true });
 
@@ -58,7 +59,8 @@ export function startHttpServer(
   const server = createServer(async (req, res) => {
     try {
       const method = req.method ?? "GET";
-      const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const pathname = url.pathname;
 
       if (method === "GET" && pathname === "/health") {
         return writeJson(res, 200, { ok: true, service: "levi-vps-gateway" });
@@ -107,6 +109,38 @@ export function startHttpServer(
         }
         await orchestrator.onAudioFrame(frame);
         return writeJson(res, 202, { accepted: true, sessionId: frame.sessionId });
+      }
+
+      if (method === "GET" && pathname === "/asterisk/egress/next") {
+        if (!hasValidAsteriskSecret(req, opts.asteriskSharedSecret)) {
+          return writeJson(res, 403, { error: "forbidden" });
+        }
+
+        const requestedSessionId = url.searchParams.get("sessionId");
+        const callId = url.searchParams.get("callId");
+        const source = url.searchParams.get("source") ?? "voipms";
+        const sessionId =
+          requestedSessionId ??
+          (callId ? orchestrator.resolveSessionIdByExternal(source, callId) : undefined);
+        if (!sessionId) {
+          return writeJson(res, 404, { error: "session_not_found" });
+        }
+
+        const next = opts.egressStore.dequeue(sessionId);
+        if (!next) {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
+        return writeJson(res, 200, {
+          sessionId,
+          encoding: next.encoding,
+          sampleRateHz: next.sampleRateHz,
+          timestampMs: next.timestampMs,
+          payloadBase64: next.payload.toString("base64"),
+          remainingQueue: opts.egressStore.size(sessionId),
+        });
       }
 
       writeJson(res, 404, { error: "not_found" });
