@@ -26,6 +26,8 @@ function main(): void {
   const server = startHttpServer(config.port, logger, orchestrator, {
     asteriskSharedSecret: config.asteriskSharedSecret,
     egressStore,
+    twilioAuthToken: config.twilioAuthToken,
+    publicBaseUrl: config.publicBaseUrl,
   });
 
   const shutdown = (signal: NodeJS.Signals): void => {
