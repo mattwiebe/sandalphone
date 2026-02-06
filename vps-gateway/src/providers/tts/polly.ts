@@ -33,7 +33,7 @@ export class StubPollyProvider implements TtsProvider {
       sessionId: chunk.sessionId,
       encoding: "pcm_s16le",
       sampleRateHz: 16000,
-      payload: Buffer.alloc(0),
+      payload: Buffer.from([0x00, 0x00, 0x00, 0x00]),
       timestampMs: Date.now(),
     };
   }

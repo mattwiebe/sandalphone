@@ -18,6 +18,7 @@ function baseConfig(): AppConfig {
     pollyVoiceEn: "Joanna",
     pollyVoiceEs: "Lupe",
     egressMaxQueuePerSession: 64,
+    stubSttText: undefined,
   };
 }
 

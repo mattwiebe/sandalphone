@@ -68,6 +68,7 @@ curl -sS http://localhost:8080/sessions
 - This scaffold is stateless in-memory; restart loses active sessions.
 - `SIGINT` and `SIGTERM` are handled for clean service shutdown.
 - Missing provider keys degrade to stubs (except Polly, enabled by default unless `DISABLE_POLLY=1`).
+- For local E2E testing without cloud keys, set `STUB_STT_TEXT` and `DISABLE_POLLY=1`.
 
 ## Integration Contracts
 ### Asterisk Inbound Contract
@@ -149,3 +150,4 @@ It returns TwiML that immediately dials the configured destination phone E.164 t
 - `POLLY_VOICE_EN` (default `Joanna`)
 - `POLLY_VOICE_ES` (default `Lupe`)
 - `DISABLE_POLLY` (`1` forces local stub TTS provider)
+- `STUB_STT_TEXT` (optional text emitted by stub STT provider for local e2e validation)

@@ -14,12 +14,13 @@ type SessionSocket = {
 
 export class StubAssemblyAiProvider implements StreamingSttProvider {
   public readonly name = "assemblyai-stub";
+  public constructor(private readonly text: string = "") {}
 
   public async transcribe(frame: AudioFrame): Promise<TranscriptionChunk | null> {
     return {
       sessionId: frame.sessionId,
-      text: "",
-      isFinal: false,
+      text: this.text,
+      isFinal: true,
       language: "es",
       timestampMs: Date.now(),
     };
