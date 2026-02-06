@@ -6,13 +6,13 @@ TypeScript-first runtime for the VPS architecture:
 - Default behavior: inbound calls ring destination phone leg with private translation mix
 
 ## Status
-Runnable scaffold with:
+Runnable gateway with:
 - Session lifecycle tracking
 - Twilio voice webhook handling (`/twilio/voice`)
 - Twilio media stream websocket upgrade path (`/twilio/stream`)
 - Asterisk inbound bridge endpoint (`/asterisk/inbound`)
 - Asterisk media ingestion endpoint (`/asterisk/media`)
-- Cloud provider adapter stubs (AssemblyAI, Google Translate, Polly)
+- Provider factory with cloud/stub selection (AssemblyAI realtime, Google Translate v2, Polly Standard)
 
 ## Run
 1. Install deps: `npm install`
@@ -65,7 +65,7 @@ curl -sS http://localhost:8080/sessions
 ## Runtime Notes
 - This scaffold is stateless in-memory; restart loses active sessions.
 - `SIGINT` and `SIGTERM` are handled for clean service shutdown.
-- Provider clients are currently stubs; env vars are prepared for the next integration slice.
+- Missing provider keys degrade to stubs (except Polly, enabled by default unless `DISABLE_POLLY=1`).
 
 ## Integration Contracts
 ### Asterisk Inbound Contract
@@ -120,3 +120,10 @@ It returns TwiML that immediately dials the configured destination phone E.164 t
 - `LOG_LEVEL` (default `info`)
 - `ASTERISK_SHARED_SECRET` (recommended on public VPS; required as `x-asterisk-secret` header for `/asterisk/inbound` and `/asterisk/media` when set)
 - `PIPELINE_MIN_FRAME_INTERVAL_MS` (default `400`; throttles STT calls per session to control API churn)
+- `ASSEMBLYAI_API_KEY` (enables realtime AssemblyAI STT)
+- `ASSEMBLYAI_REALTIME_URL` (optional override for realtime WS URL)
+- `GOOGLE_TRANSLATE_API_KEY` (enables Google Translate v2 REST provider)
+- `AWS_REGION` (default `us-west-2`)
+- `POLLY_VOICE_EN` (default `Joanna`)
+- `POLLY_VOICE_ES` (default `Lupe`)
+- `DISABLE_POLLY` (`1` forces local stub TTS provider)
