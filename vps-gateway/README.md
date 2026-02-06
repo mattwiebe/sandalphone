@@ -17,10 +17,11 @@ Runnable gateway with:
 ## Run
 1. Install deps: `npm install`
 2. Build once: `npm run build`
-3. Use CLI: `node dist/cli.js help`
-4. Typecheck: `node dist/cli.js check`
-5. Tests: `node dist/cli.js test`
-6. Start dev server: `node dist/cli.js dev`
+3. Configure env interactively: `sandalphone install`
+4. Use CLI: `sandalphone help`
+5. Typecheck: `sandalphone check`
+6. Tests: `sandalphone test`
+7. Start dev server: `sandalphone dev`
 
 ## CLI
 Primary operator surface:
@@ -34,6 +35,7 @@ Core commands:
 ```bash
 sandalphone build
 sandalphone check
+sandalphone install
 sandalphone test
 sandalphone test smoke
 sandalphone test quick
@@ -97,8 +99,7 @@ sandalphone smoke live --strict-egress
 1. Install Node.js 22+ on VPS.
 2. Clone repo and move into `/Users/matt/levi/vps-gateway`.
 3. Create env file:
-   - `cp .env.example .env`
-   - Set `DESTINATION_PHONE_E164` and cloud credentials.
+   - Run `sandalphone install`
    - Run `sandalphone doctor deploy`
 4. Install and enable systemd service:
    - `sandalphone service print-unit`
@@ -211,6 +212,8 @@ It returns TwiML that immediately dials the configured destination phone E.164 t
 ## Env
 - `PORT` (default `8080`)
 - `DESTINATION_PHONE_E164` (default `+15555550100`)
+- `TWILIO_PHONE_NUMBER` (optional metadata for your Twilio DID)
+- `VOIPMS_DID` (optional metadata for your VoIP.ms DID)
 - `LOG_LEVEL` (default `info`)
 - `ASTERISK_SHARED_SECRET` (recommended on public VPS; required as `x-asterisk-secret` header for `/asterisk/inbound` and `/asterisk/media` when set)
 - `PIPELINE_MIN_FRAME_INTERVAL_MS` (default `400`; throttles STT calls per session to control API churn)
@@ -225,3 +228,8 @@ It returns TwiML that immediately dials the configured destination phone E.164 t
 - `STUB_STT_TEXT` (optional text emitted by stub STT provider for local e2e validation)
 - `TWILIO_AUTH_TOKEN` (optional; enables Twilio signature validation)
 - `PUBLIC_BASE_URL` (optional override for signature URL, e.g. `https://voice.yourdomain.com`)
+To write to a non-default env file:
+
+```bash
+sandalphone install --env-path /path/to/.env
+```
