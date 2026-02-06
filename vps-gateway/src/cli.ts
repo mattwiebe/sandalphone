@@ -70,6 +70,10 @@ async function main(argv: string[]): Promise<void> {
       handleDoctor(rest, context);
       return;
     }
+    case "urls": {
+      handleUrls(rest, context);
+      return;
+    }
     case "service": {
       handleService(rest, context);
       return;
@@ -557,6 +561,25 @@ function handleDoctor(args: string[], context: CliContext): void {
   runNodeScript("scripts/deploy-preflight.mjs", context, env);
 }
 
+function handleUrls(args: string[], context: CliContext): void {
+  const { flags } = parseFlags(args);
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const env = parseEnvFile(envText);
+
+  const baseUrl = normalizePublicBaseUrl(flags["base-url"] ?? env.PUBLIC_BASE_URL ?? "");
+  if (!baseUrl) {
+    die("PUBLIC_BASE_URL is required. Set it in .env or pass --base-url https://...");
+  }
+  if (!/^https:\/\//.test(baseUrl)) {
+    die("PUBLIC_BASE_URL must be HTTPS for Twilio webhooks");
+  }
+
+  process.stdout.write(`[sandalphone] base url: ${baseUrl}\n`);
+  process.stdout.write(`[sandalphone] Twilio Voice webhook: ${baseUrl}/twilio/voice\n`);
+  process.stdout.write(`[sandalphone] Twilio Media Stream WS: wss://${stripScheme(baseUrl)}/twilio/stream\n`);
+}
+
 function handleService(args: string[], context: CliContext): void {
   const action = args[0] ?? "help";
 
@@ -884,6 +907,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
   process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
+  process.stdout.write(`  sandalphone urls [--env-path .env] [--base-url https://...]\n`);
   process.stdout.write(`  sandalphone funnel <action>\n`);
   process.stdout.write(`  sandalphone doctor deploy [--env-path .env]\n`);
   process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);
