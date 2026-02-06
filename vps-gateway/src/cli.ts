@@ -539,11 +539,22 @@ function handleSmoke(args: string[], context: CliContext): void {
 
 function handleDoctor(args: string[], context: CliContext): void {
   const mode = args[0] ?? "deploy";
-  if (mode !== "deploy") {
+  if (mode !== "deploy" && mode !== "local") {
     die(`unknown doctor mode: ${mode}`);
   }
 
-  runNodeScript("scripts/deploy-preflight.mjs", context);
+  const { flags } = parseFlags(args.slice(1));
+  const env: Dict = {};
+  if (flags["env-path"]) {
+    env.ENV_PATH = resolve(context.projectRoot, flags["env-path"]);
+  }
+
+  if (mode === "local") {
+    runNodeScript("scripts/doctor-local.mjs", context, env);
+    return;
+  }
+
+  runNodeScript("scripts/deploy-preflight.mjs", context, env);
 }
 
 function handleService(args: string[], context: CliContext): void {
@@ -874,7 +885,8 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
   process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
   process.stdout.write(`  sandalphone funnel <action>\n`);
-  process.stdout.write(`  sandalphone doctor deploy\n`);
+  process.stdout.write(`  sandalphone doctor deploy [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);
   process.stdout.write(`  sandalphone service <action>\n\n`);
   process.stdout.write(`Legacy alias: levi <command>\n\n`);
   printFunnelHelp();

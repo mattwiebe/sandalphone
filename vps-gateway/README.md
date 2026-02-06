@@ -61,6 +61,7 @@ sandalphone test smoke
 sandalphone test quick
 sandalphone smoke live --base-url https://voice.yourdomain.com
 sandalphone doctor deploy
+sandalphone doctor local
 sandalphone service print-unit
 sandalphone service print-launchd
 sandalphone service install-launchd
@@ -297,3 +298,15 @@ sandalphone service install-launchd \
   --stdout-log /tmp/sandalphone-dev.out.log \
   --stderr-log /tmp/sandalphone-dev.err.log
 ```
+
+## Local Readiness Check
+Before live call tests on macOS:
+
+```bash
+sandalphone doctor local
+```
+
+Checks:
+- `.env` presence and required target phone format
+- `PUBLIC_BASE_URL` HTTPS validity
+- Tailscale CLI/funnel status visibility
