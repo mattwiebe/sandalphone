@@ -7,42 +7,41 @@ BOT_PLIST="$HOME/Library/LaunchAgents/com.levi.telegram-bot.plist"
 case "$1" in
     start)
         echo "Starting Levi services..."
-        launchctl load "$BACKEND_PLIST" 2>/dev/null
-        launchctl load "$BOT_PLIST" 2>/dev/null
+        launchctl bootstrap "gui/$(id -u)" "$BACKEND_PLIST" 2>/dev/null
+        launchctl bootstrap "gui/$(id -u)" "$BOT_PLIST" 2>/dev/null
         sleep 2
         $0 status
         ;;
 
     stop)
         echo "Stopping Levi services..."
-        launchctl unload "$BACKEND_PLIST" 2>/dev/null
-        launchctl unload "$BOT_PLIST" 2>/dev/null
+        launchctl bootout "gui/$(id -u)" "$BACKEND_PLIST" 2>/dev/null
+        launchctl bootout "gui/$(id -u)" "$BOT_PLIST" 2>/dev/null
         echo "Services stopped."
         ;;
 
     restart)
         echo "Restarting Levi services..."
-        $0 stop
-        sleep 1
-        $0 start
+        launchctl kickstart -k "gui/$(id -u)/com.levi.mac-backend" 2>/dev/null
+        launchctl kickstart -k "gui/$(id -u)/com.levi.telegram-bot" 2>/dev/null
         ;;
 
     status)
         echo "Levi Service Status:"
         echo "===================="
 
-        if ps aux | grep -v grep | grep "python.*main.py" > /dev/null; then
-            echo "✅ Mac Backend: RUNNING"
-            ps aux | grep -v grep | grep "python.*main.py" | awk '{print "   PID:", $2, "| Memory:", $6/1024 "MB"}'
+        if launchctl list | grep -q "com.levi.mac-backend"; then
+            echo "✅ Mac Backend: LOADED"
+            launchctl list | grep "com.levi.mac-backend" | awk '{print "   PID:", $1, "| LastExit:", $3}'
         else
-            echo "❌ Mac Backend: NOT RUNNING"
+            echo "❌ Mac Backend: NOT LOADED"
         fi
 
-        if ps aux | grep -v grep | grep "python.*telegram_bot.py" > /dev/null; then
-            echo "✅ Telegram Bot: RUNNING"
-            ps aux | grep -v grep | grep "python.*telegram_bot.py" | awk '{print "   PID:", $2, "| Memory:", $6/1024 "MB"}'
+        if launchctl list | grep -q "com.levi.telegram-bot"; then
+            echo "✅ Telegram Bot: LOADED"
+            launchctl list | grep "com.levi.telegram-bot" | awk '{print "   PID:", $1, "| LastExit:", $3}'
         else
-            echo "❌ Telegram Bot: NOT RUNNING"
+            echo "❌ Telegram Bot: NOT LOADED"
         fi
         ;;
 
