@@ -120,18 +120,38 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       POLLY_VOICE_ES: currentValues.POLLY_VOICE_ES ?? "Lupe",
     };
 
+    const selectedPort = await prompt(rl, "Gateway HTTP port", {
+      defaultValue: defaults.PORT,
+      required: true,
+      validate: (value) => {
+        const port = Number(value);
+        if (!Number.isFinite(port) || port <= 0) return "must be a positive number";
+        return undefined;
+      },
+    });
+
+    let detectedPublicBaseUrl = "";
+    const enableFunnel = await promptYesNo(
+      rl,
+      "Set up Tailscale Funnel now and auto-fill PUBLIC_BASE_URL?",
+      defaults.PUBLIC_BASE_URL.length === 0,
+    );
+    if (enableFunnel) {
+      const url = setupFunnelAndPersistEnv(context, selectedPort, envPath);
+      if (url) {
+        detectedPublicBaseUrl = url;
+        process.stdout.write(`[sandalphone] detected funnel URL: ${url}\n`);
+      } else {
+        process.stdout.write(
+          "[sandalphone] funnel configured but URL was not detected automatically; enter it manually next\n",
+        );
+      }
+    }
+
     const updates: EnvMap = {
-      PORT: await prompt(rl, "Gateway HTTP port", {
-        defaultValue: defaults.PORT,
-        required: true,
-        validate: (value) => {
-          const port = Number(value);
-          if (!Number.isFinite(port) || port <= 0) return "must be a positive number";
-          return undefined;
-        },
-      }),
+      PORT: selectedPort,
       PUBLIC_BASE_URL: await prompt(rl, "Public base URL (for Twilio signature checks)", {
-        defaultValue: defaults.PUBLIC_BASE_URL,
+        defaultValue: detectedPublicBaseUrl || defaults.PUBLIC_BASE_URL,
       }),
       DESTINATION_PHONE_E164: await prompt(rl, "Primary destination phone (E.164)", {
         defaultValue: defaults.DESTINATION_PHONE_E164,
@@ -191,18 +211,7 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
     const mergedText = applyEnvUpdates(currentText, updates);
     writeFileSync(envPath, mergedText.endsWith("\n") ? mergedText : `${mergedText}\n`, "utf8");
 
-    let publicBaseUrl = updates.PUBLIC_BASE_URL;
-    if (!publicBaseUrl) {
-      const enableFunnel = await promptYesNo(
-        rl,
-        "Set up Tailscale Funnel now and auto-fill PUBLIC_BASE_URL?",
-        false,
-      );
-      if (enableFunnel) {
-        const url = setupFunnelAndPersistEnv(context, updates.PORT, envPath);
-        if (url) publicBaseUrl = url;
-      }
-    }
+    const publicBaseUrl = updates.PUBLIC_BASE_URL;
 
     process.stdout.write(`\n[sandalphone] wrote env file: ${envPath}\n`);
     process.stdout.write("[sandalphone] next steps:\n");
