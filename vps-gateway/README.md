@@ -18,7 +18,7 @@ Runnable gateway with:
 1. Install deps: `npm install`
 2. Build once: `npm run build`
 3. Configure env interactively: `sandalphone install`
-   - Installer now prints Mac+tunnel guidance (including Tailscale Funnel) and exact Twilio webhook/media URLs.
+   - Installer can run Tailscale Funnel and auto-fill `PUBLIC_BASE_URL`.
 4. Use CLI: `sandalphone help`
 5. Typecheck: `sandalphone check`
 6. Tests: `sandalphone test`
@@ -37,6 +37,9 @@ Core commands:
 sandalphone build
 sandalphone check
 sandalphone install
+sandalphone funnel up --port 8080
+sandalphone funnel status
+sandalphone funnel reset --clear-env
 sandalphone test
 sandalphone test smoke
 sandalphone test quick
@@ -84,6 +87,17 @@ Fail if egress has no chunk (`204`):
 ```bash
 sandalphone smoke live --strict-egress
 ```
+
+### Tailscale Funnel Commands
+Manage local public ingress from CLI:
+
+```bash
+sandalphone funnel up --port 8080
+sandalphone funnel status
+sandalphone funnel reset --clear-env
+```
+
+`sandalphone funnel up` writes detected URL into `.env` as `PUBLIC_BASE_URL`.
 
 ## Current Endpoints
 - `GET /health`
