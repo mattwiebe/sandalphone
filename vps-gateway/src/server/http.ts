@@ -7,6 +7,8 @@ import { handleTwilioInbound } from "../ingress/twilio.js";
 import {
   handleAsteriskInbound,
   mapAsteriskMediaToFrame,
+  resolveAsteriskEndSessionId,
+  validateAsteriskEndPayload,
   validateAsteriskInboundPayload,
   validateAsteriskMediaPayload,
 } from "../ingress/asterisk.js";
@@ -109,6 +111,23 @@ export function startHttpServer(
         }
         await orchestrator.onAudioFrame(frame);
         return writeJson(res, 202, { accepted: true, sessionId: frame.sessionId });
+      }
+
+      if (method === "POST" && pathname === "/asterisk/end") {
+        if (!hasValidAsteriskSecret(req, opts.asteriskSharedSecret)) {
+          return writeJson(res, 403, { error: "forbidden" });
+        }
+        const payload = await readJsonBody(req);
+        if (!validateAsteriskEndPayload(payload)) {
+          return writeJson(res, 400, { error: "invalid_payload" });
+        }
+        const sessionId = resolveAsteriskEndSessionId(orchestrator, payload);
+        if (!sessionId) {
+          return writeJson(res, 404, { error: "session_not_found" });
+        }
+        orchestrator.endSession(sessionId);
+        opts.egressStore.clear(sessionId);
+        return writeJson(res, 200, { ended: true, sessionId });
       }
 
       if (method === "GET" && pathname === "/asterisk/egress/next") {
