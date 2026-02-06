@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "TypeScript VPS voice gateway for Levi",
+  "bin": {
+    "levi": "dist/cli.js"
+  },
   "engines": {
     "node": ">=22"
   },
@@ -17,6 +20,7 @@
     "test:quick": "npm run check && npm run test:smoke",
     "smoke:live": "node ./scripts/smoke-live.mjs",
     "deploy:preflight": "node ./scripts/deploy-preflight.mjs",
+    "cli": "node dist/cli.js",
     "docker:build": "docker compose build",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down"

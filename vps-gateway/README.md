@@ -16,14 +16,33 @@ Runnable gateway with:
 
 ## Run
 1. Install deps: `npm install`
-2. Copy envs: `cp .env.example .env` and set values
-2. Typecheck: `npm run check`
-3. Build: `npm run build`
-4. Test: `npm test`
-5. Smoke tests only: `npm run test:smoke`
-6. Quick gate (typecheck + smoke): `npm run test:quick`
-7. Live endpoint smoke against a running service: `npm run smoke:live`
-8. Start dev server: `npm run dev`
+2. Build once: `npm run build`
+3. Use CLI: `node dist/cli.js help`
+4. Typecheck: `node dist/cli.js check`
+5. Tests: `node dist/cli.js test`
+6. Start dev server: `node dist/cli.js dev`
+
+## CLI
+Primary operator surface:
+
+```bash
+node dist/cli.js help
+```
+
+Core commands:
+
+```bash
+node dist/cli.js build
+node dist/cli.js check
+node dist/cli.js test
+node dist/cli.js test smoke
+node dist/cli.js test quick
+node dist/cli.js smoke live --base-url https://voice.yourdomain.com
+node dist/cli.js doctor deploy
+node dist/cli.js service print-unit
+node dist/cli.js service status
+node dist/cli.js service logs --lines 200
+```
 
 ## Smoke Test
 With server running on port `8080`:
@@ -46,21 +65,21 @@ curl -sS http://localhost:8080/sessions
 Run against a running gateway (local or VPS):
 
 ```bash
-BASE_URL=http://127.0.0.1:8080 npm run smoke:live
+node dist/cli.js smoke live --base-url http://127.0.0.1:8080
 ```
 
 When Asterisk secret is enabled:
 
 ```bash
-BASE_URL=https://voice.yourdomain.com \
-ASTERISK_SHARED_SECRET=your-secret \
-npm run smoke:live
+node dist/cli.js smoke live \
+  --base-url https://voice.yourdomain.com \
+  --secret your-secret
 ```
 
 Fail if egress has no chunk (`204`):
 
 ```bash
-STRICT_EGRESS=1 npm run smoke:live
+node dist/cli.js smoke live --strict-egress
 ```
 
 ## Current Endpoints
@@ -75,16 +94,20 @@ STRICT_EGRESS=1 npm run smoke:live
 - `WS /twilio/stream` (Twilio media stream)
 
 ## Deploy (VPS)
-1. Install Docker + Compose plugin on VPS.
+1. Install Node.js 22+ on VPS.
 2. Clone repo and move into `/Users/matt/levi/vps-gateway`.
 3. Create env file:
    - `cp .env.example .env`
    - Set `DESTINATION_PHONE_E164` and cloud credentials.
-   - Run `npm run deploy:preflight`
-4. Start service:
-   - `npm run docker:up`
+   - Run `node dist/cli.js doctor deploy`
+4. Install and enable systemd service:
+   - `node dist/cli.js service print-unit`
+   - `sudo node dist/cli.js service install-unit`
+   - `sudo node dist/cli.js service reload`
+   - `sudo node dist/cli.js service enable`
+   - `sudo node dist/cli.js service restart`
 5. Verify:
-   - `curl -sS http://localhost:8080/health`
+   - `node dist/cli.js smoke live --base-url http://127.0.0.1:8080`
 6. Point providers to VPS:
    - Twilio voice webhook -> `POST /twilio/voice`
    - Twilio media stream websocket -> `WS /twilio/stream`
