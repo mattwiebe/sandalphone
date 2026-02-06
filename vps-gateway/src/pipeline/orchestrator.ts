@@ -10,10 +10,12 @@ export type OrchestratorDeps = {
   readonly translator: TranslationProvider;
   readonly tts: TtsProvider;
   readonly destination phoneE164: string;
+  readonly minFrameIntervalMs?: number;
 };
 
 export class VoiceOrchestrator {
   private readonly metrics = new Map<string, SessionMetrics>();
+  private readonly lastFrameAtMs = new Map<string, number>();
 
   public constructor(private readonly deps: OrchestratorDeps) {}
 
@@ -52,6 +54,16 @@ export class VoiceOrchestrator {
       });
       return;
     }
+
+    const minFrameIntervalMs = this.deps.minFrameIntervalMs ?? 0;
+    const previousFrameTs = this.lastFrameAtMs.get(frame.sessionId);
+    if (
+      previousFrameTs !== undefined &&
+      frame.timestampMs - previousFrameTs < minFrameIntervalMs
+    ) {
+      return;
+    }
+    this.lastFrameAtMs.set(frame.sessionId, frame.timestampMs);
 
     const sttStart = Date.now();
     const transcript = await this.deps.stt.transcribe(frame);

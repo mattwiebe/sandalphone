@@ -18,6 +18,7 @@ function main(): void {
     translator: new GoogleTranslationProvider(),
     tts: new PollyStandardProvider(),
     destination phoneE164: config.destination phoneE164,
+    minFrameIntervalMs: config.pipelineMinFrameIntervalMs,
   });
 
   const server = startHttpServer(config.port, logger, orchestrator, {
