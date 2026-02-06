@@ -27,6 +27,8 @@ wheels/
 mac/models/whisper.cpp/
 mac/models/qwen-7b-4bit/
 mac/models/qwen3-tts-0.6b/
+mac/models/qwen-14b-4bit/
+mac/models/
 
 # Data
 mac/data/
