@@ -60,6 +60,7 @@ sandalphone test
 sandalphone test smoke
 sandalphone test quick
 sandalphone smoke live --base-url https://voice.yourdomain.com
+sandalphone urls
 sandalphone doctor deploy
 sandalphone doctor local
 sandalphone service print-unit
@@ -310,3 +311,12 @@ Checks:
 - `.env` presence and required target phone format
 - `PUBLIC_BASE_URL` HTTPS validity
 - Tailscale CLI/funnel status visibility
+
+## Twilio URL Output
+Print exact URLs to paste in Twilio console:
+
+```bash
+sandalphone urls
+# or override explicitly
+sandalphone urls --base-url https://your-funnel-host.ts.net
+```
