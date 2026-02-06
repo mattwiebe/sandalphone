@@ -14,6 +14,10 @@ export interface AppConfig {
   readonly stubSttText?: string;
   readonly twilioAuthToken?: string;
   readonly publicBaseUrl?: string;
+  readonly controlApiSecret?: string;
+  readonly openClawBridgeUrl?: string;
+  readonly openClawBridgeApiKey?: string;
+  readonly openClawBridgeTimeoutMs: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -35,6 +39,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   if (!Number.isFinite(egressMaxQueuePerSession) || egressMaxQueuePerSession < 1) {
     throw new Error(`Invalid EGRESS_MAX_QUEUE_PER_SESSION: ${env.EGRESS_MAX_QUEUE_PER_SESSION}`);
   }
+  const openClawBridgeTimeoutMs = Number(env.OPENCLAW_BRIDGE_TIMEOUT_MS ?? "1200");
+  if (!Number.isFinite(openClawBridgeTimeoutMs) || openClawBridgeTimeoutMs < 100) {
+    throw new Error(`Invalid OPENCLAW_BRIDGE_TIMEOUT_MS: ${env.OPENCLAW_BRIDGE_TIMEOUT_MS}`);
+  }
 
   return {
     port,
@@ -52,5 +60,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     stubSttText: env.STUB_STT_TEXT,
     twilioAuthToken: env.TWILIO_AUTH_TOKEN,
     publicBaseUrl: env.PUBLIC_BASE_URL,
+    controlApiSecret: env.CONTROL_API_SECRET,
+    openClawBridgeUrl: env.OPENCLAW_BRIDGE_URL,
+    openClawBridgeApiKey: env.OPENCLAW_BRIDGE_API_KEY,
+    openClawBridgeTimeoutMs,
   };
 }

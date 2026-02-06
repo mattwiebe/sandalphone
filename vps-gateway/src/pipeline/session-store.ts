@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { CallSession, IncomingCallEvent, SessionState } from "../domain/types.js";
+import type {
+  CallSession,
+  IncomingCallEvent,
+  SessionControlUpdate,
+  SessionState,
+} from "../domain/types.js";
 
 export class SessionStore {
   private readonly sessions = new Map<string, CallSession>();
@@ -43,6 +48,16 @@ export class SessionStore {
     const existing = this.sessions.get(id);
     if (!existing) return undefined;
     existing.state = state;
+    return existing;
+  }
+
+  public updateControl(id: string, patch: SessionControlUpdate): CallSession | undefined {
+    const existing = this.sessions.get(id);
+    if (!existing) return undefined;
+
+    if (patch.mode !== undefined) existing.mode = patch.mode;
+    if (patch.sourceLanguage !== undefined) existing.sourceLanguage = patch.sourceLanguage;
+    if (patch.targetLanguage !== undefined) existing.targetLanguage = patch.targetLanguage;
     return existing;
   }
 }

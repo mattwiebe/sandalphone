@@ -63,6 +63,9 @@ if (publicBaseUrl && !/^https:\/\//.test(publicBaseUrl)) {
 if (env.TWILIO_AUTH_TOKEN && !publicBaseUrl) {
   warnings.push("TWILIO_AUTH_TOKEN is set but PUBLIC_BASE_URL is empty");
 }
+if (!env.CONTROL_API_SECRET) {
+  warnings.push("CONTROL_API_SECRET is not set; /sessions/control and /openclaw/command are unauthenticated");
+}
 
 const tailscaleVersion = runCapture("tailscale", ["version"]);
 if (tailscaleVersion.status !== 0) {

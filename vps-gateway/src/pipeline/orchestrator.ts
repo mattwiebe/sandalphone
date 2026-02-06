@@ -1,6 +1,14 @@
 import type { Logger } from "../server/logger.js";
 import type { StreamingSttProvider, TranslationProvider, TtsProvider } from "../domain/providers.js";
-import type { AudioFrame, CallSession, IncomingCallEvent, SessionMetrics, TtsChunk } from "../domain/types.js";
+import type {
+  AudioFrame,
+  CallSession,
+  IncomingCallEvent,
+  SessionControlUpdate,
+  SessionEvent,
+  SessionMetrics,
+  TtsChunk,
+} from "../domain/types.js";
 import { SessionStore } from "./session-store.js";
 
 export type OrchestratorDeps = {
@@ -12,6 +20,7 @@ export type OrchestratorDeps = {
   readonly outboundTargetE164: string;
   readonly minFrameIntervalMs?: number;
   readonly onTtsChunk?: (chunk: TtsChunk) => Promise<void> | void;
+  readonly onSessionEvent?: (event: SessionEvent) => Promise<void> | void;
 };
 
 export class VoiceOrchestrator {
@@ -40,6 +49,19 @@ export class VoiceOrchestrator {
       ringTarget: session.targetPhoneE164,
     });
     this.deps.sessionStore.updateState(session.id, "active");
+    void this.emitEvent({
+      type: "session.started",
+      sessionId: session.id,
+      atMs: Date.now(),
+      payload: {
+        source: session.source,
+        inboundCaller: session.inboundCaller,
+        targetPhoneE164: session.targetPhoneE164,
+        mode: session.mode,
+        sourceLanguage: session.sourceLanguage,
+        targetLanguage: session.targetLanguage,
+      },
+    });
     return session;
   }
 
@@ -47,12 +69,42 @@ export class VoiceOrchestrator {
     return this.deps.sessionStore.getByExternal(source, externalCallId)?.id;
   }
 
+  public updateSessionControl(
+    sessionId: string,
+    patch: SessionControlUpdate,
+  ): CallSession | undefined {
+    const session = this.deps.sessionStore.updateControl(sessionId, patch);
+    if (!session) return undefined;
+
+    this.deps.logger.info("session control updated", {
+      sessionId,
+      mode: session.mode,
+      sourceLanguage: session.sourceLanguage,
+      targetLanguage: session.targetLanguage,
+    });
+    void this.emitEvent({
+      type: "session.control.updated",
+      sessionId,
+      atMs: Date.now(),
+      payload: {
+        mode: session.mode,
+        sourceLanguage: session.sourceLanguage,
+        targetLanguage: session.targetLanguage,
+      },
+    });
+    return session;
+  }
+
   public async onAudioFrame(frame: AudioFrame): Promise<void> {
-    if (!this.deps.sessionStore.get(frame.sessionId)) {
+    const session = this.deps.sessionStore.get(frame.sessionId);
+    if (!session) {
       this.deps.logger.warn("audio frame for unknown session", {
         sessionId: frame.sessionId,
         source: frame.source,
       });
+      return;
+    }
+    if (session.mode === "passthrough") {
       return;
     }
 
@@ -74,6 +126,16 @@ export class VoiceOrchestrator {
       this.trackMetrics(frame.sessionId, { sessionId: frame.sessionId, sttLatencyMs });
       return;
     }
+    void this.emitEvent({
+      type: "session.transcript",
+      sessionId: frame.sessionId,
+      atMs: transcript.timestampMs,
+      payload: {
+        text: transcript.text,
+        isFinal: transcript.isFinal,
+        language: transcript.language,
+      },
+    });
 
     const translateStart = Date.now();
     const translation = await this.deps.translator.translate(transcript);
@@ -87,6 +149,16 @@ export class VoiceOrchestrator {
       });
       return;
     }
+    void this.emitEvent({
+      type: "session.translation",
+      sessionId: frame.sessionId,
+      atMs: translation.timestampMs,
+      payload: {
+        text: translation.text,
+        sourceLanguage: translation.sourceLanguage,
+        targetLanguage: translation.targetLanguage,
+      },
+    });
 
     const ttsStart = Date.now();
     const tts = await this.deps.tts.synthesize(translation);
@@ -122,6 +194,15 @@ export class VoiceOrchestrator {
       source: session.source,
       metrics: this.metrics.get(sessionId),
     });
+    void this.emitEvent({
+      type: "session.ended",
+      sessionId,
+      atMs: Date.now(),
+      payload: {
+        source: session.source,
+        metrics: this.metrics.get(sessionId) ?? {},
+      },
+    });
   }
 
   public listSessions(): CallSession[] {
@@ -141,5 +222,18 @@ export class VoiceOrchestrator {
       ttsLatencyMs: delta.ttsLatencyMs ?? previous.ttsLatencyMs,
       pipelineLatencyMs: delta.pipelineLatencyMs ?? previous.pipelineLatencyMs,
     });
+  }
+
+  private async emitEvent(event: SessionEvent): Promise<void> {
+    if (!this.deps.onSessionEvent) return;
+    try {
+      await this.deps.onSessionEvent(event);
+    } catch (error) {
+      this.deps.logger.warn("session event hook failed", {
+        type: event.type,
+        sessionId: event.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 }

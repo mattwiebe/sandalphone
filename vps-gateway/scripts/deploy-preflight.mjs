@@ -24,6 +24,18 @@ if (process.env.TWILIO_AUTH_TOKEN && !process.env.PUBLIC_BASE_URL) {
 if (!process.env.ASTERISK_SHARED_SECRET) {
   warnings.push("ASTERISK_SHARED_SECRET is not set; Asterisk ingress endpoints are unauthenticated");
 }
+if (!process.env.CONTROL_API_SECRET) {
+  warnings.push("CONTROL_API_SECRET is not set; control endpoints are unauthenticated");
+}
+if (process.env.OPENCLAW_BRIDGE_URL && !/^https?:\/\//.test(process.env.OPENCLAW_BRIDGE_URL)) {
+  failures.push("OPENCLAW_BRIDGE_URL must be http(s) URL");
+}
+if (process.env.OPENCLAW_BRIDGE_TIMEOUT_MS) {
+  const timeout = Number(process.env.OPENCLAW_BRIDGE_TIMEOUT_MS);
+  if (!Number.isFinite(timeout) || timeout < 100) {
+    failures.push("OPENCLAW_BRIDGE_TIMEOUT_MS must be a number >= 100");
+  }
+}
 
 if (!optionalCloud.some((key) => Boolean(process.env[key])) && process.env.STUB_STT_TEXT === undefined) {
   warnings.push(

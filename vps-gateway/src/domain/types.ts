@@ -66,3 +66,21 @@ export interface SessionMetrics {
   readonly ttsLatencyMs?: number;
   readonly pipelineLatencyMs?: number;
 }
+
+export interface SessionControlUpdate {
+  readonly mode?: SessionMode;
+  readonly sourceLanguage?: LanguageCode;
+  readonly targetLanguage?: LanguageCode;
+}
+
+export interface SessionEvent {
+  readonly type:
+    | "session.started"
+    | "session.ended"
+    | "session.control.updated"
+    | "session.transcript"
+    | "session.translation";
+  readonly sessionId: string;
+  readonly atMs: number;
+  readonly payload: Record<string, unknown>;
+}

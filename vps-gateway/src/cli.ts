@@ -74,6 +74,10 @@ async function main(argv: string[]): Promise<void> {
       handleUrls(rest, context);
       return;
     }
+    case "openclaw": {
+      await handleOpenClaw(rest, context);
+      return;
+    }
     case "service": {
       handleService(rest, context);
       return;
@@ -119,6 +123,7 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       VOIPMS_DID: currentValues.VOIPMS_DID ?? "",
       ASTERISK_SHARED_SECRET:
         currentValues.ASTERISK_SHARED_SECRET ?? randomBytes(16).toString("hex"),
+      CONTROL_API_SECRET: currentValues.CONTROL_API_SECRET ?? randomBytes(16).toString("hex"),
       TWILIO_AUTH_TOKEN: currentValues.TWILIO_AUTH_TOKEN ?? "",
       ASSEMBLYAI_API_KEY: currentValues.ASSEMBLYAI_API_KEY ?? "",
       GOOGLE_TRANSLATE_API_KEY: currentValues.GOOGLE_TRANSLATE_API_KEY ?? "",
@@ -127,6 +132,9 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       AWS_REGION: currentValues.AWS_REGION ?? "us-west-2",
       POLLY_VOICE_EN: currentValues.POLLY_VOICE_EN ?? "Joanna",
       POLLY_VOICE_ES: currentValues.POLLY_VOICE_ES ?? "Lupe",
+      OPENCLAW_BRIDGE_URL: currentValues.OPENCLAW_BRIDGE_URL ?? "",
+      OPENCLAW_BRIDGE_API_KEY: currentValues.OPENCLAW_BRIDGE_API_KEY ?? "",
+      OPENCLAW_BRIDGE_TIMEOUT_MS: currentValues.OPENCLAW_BRIDGE_TIMEOUT_MS ?? "1200",
     };
 
     const selectedPort = await prompt(rl, "Gateway HTTP port", {
@@ -186,6 +194,11 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         secret: true,
         required: true,
       }),
+      CONTROL_API_SECRET: await prompt(rl, "Control API secret", {
+        defaultValue: defaults.CONTROL_API_SECRET,
+        secret: true,
+        required: true,
+      }),
       TWILIO_AUTH_TOKEN: await prompt(rl, "Twilio auth token", {
         defaultValue: defaults.TWILIO_AUTH_TOKEN,
         secret: true,
@@ -217,6 +230,22 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       POLLY_VOICE_ES: await prompt(rl, "Polly Spanish voice", {
         defaultValue: defaults.POLLY_VOICE_ES,
         required: true,
+      }),
+      OPENCLAW_BRIDGE_URL: await prompt(rl, "OpenClaw bridge URL (optional)", {
+        defaultValue: defaults.OPENCLAW_BRIDGE_URL,
+      }),
+      OPENCLAW_BRIDGE_API_KEY: await prompt(rl, "OpenClaw bridge API key (optional)", {
+        defaultValue: defaults.OPENCLAW_BRIDGE_API_KEY,
+        secret: true,
+      }),
+      OPENCLAW_BRIDGE_TIMEOUT_MS: await prompt(rl, "OpenClaw bridge timeout ms", {
+        defaultValue: defaults.OPENCLAW_BRIDGE_TIMEOUT_MS,
+        required: true,
+        validate: (value) => {
+          const timeout = Number(value);
+          if (!Number.isFinite(timeout) || timeout < 100) return "must be a number >= 100";
+          return undefined;
+        },
       }),
     };
 
@@ -580,6 +609,56 @@ function handleUrls(args: string[], context: CliContext): void {
   process.stdout.write(`[sandalphone] Twilio Media Stream WS: wss://${stripScheme(baseUrl)}/twilio/stream\n`);
 }
 
+async function handleOpenClaw(args: string[], context: CliContext): Promise<void> {
+  const action = args[0] ?? "help";
+  if (action === "help") {
+    printOpenClawHelp();
+    return;
+  }
+  if (action !== "command") {
+    die(`unknown openclaw action: ${action}`);
+  }
+
+  const { flags, extras } = parseFlags(args.slice(1));
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const env = parseEnvFile(envText);
+  const baseUrl = normalizePublicBaseUrl(flags["base-url"] ?? env.PUBLIC_BASE_URL ?? "");
+  if (!baseUrl) {
+    die("PUBLIC_BASE_URL is required. Set it in .env or pass --base-url");
+  }
+
+  const command = flags.command ?? extras.join(" ").trim();
+  if (!command) {
+    die("openclaw command text is required (--command \"...\" or positional text)");
+  }
+
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
+  const controlSecret = flags.secret ?? env.CONTROL_API_SECRET;
+  if (controlSecret) {
+    headers["x-control-secret"] = controlSecret;
+  }
+
+  const response = await fetch(`${baseUrl}/openclaw/command`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      command,
+      sessionId: flags["session-id"],
+      callId: flags["call-id"],
+      source: flags.source,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    die(`openclaw command failed with ${response.status}: ${body.slice(0, 300)}`);
+  }
+  process.stdout.write("[sandalphone] openclaw command accepted\n");
+}
+
 function handleService(args: string[], context: CliContext): void {
   const action = args[0] ?? "help";
 
@@ -908,6 +987,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
   process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
   process.stdout.write(`  sandalphone urls [--env-path .env] [--base-url https://...]\n`);
+  process.stdout.write(`  sandalphone openclaw command --command \"...\" [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone funnel <action>\n`);
   process.stdout.write(`  sandalphone doctor deploy [--env-path .env]\n`);
   process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);
@@ -940,6 +1020,13 @@ function printServiceHelp(): void {
   process.stdout.write(`  sandalphone service restart\n`);
   process.stdout.write(`  sandalphone service status\n`);
   process.stdout.write(`  sandalphone service logs [--lines N]\n`);
+}
+
+function printOpenClawHelp(): void {
+  process.stdout.write(`OpenClaw actions:\n`);
+  process.stdout.write(`  sandalphone openclaw command --command "research..." [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone openclaw command "research..." [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`\n`);
 }
 
 function cliVersion(): string {

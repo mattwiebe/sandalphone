@@ -4,17 +4,20 @@ import type { IncomingMessage } from "node:http";
 import {
   computeTwilioSignature,
   hasValidAsteriskSecret,
+  hasValidControlSecret,
   hasValidTwilioSignature,
 } from "../server/auth.js";
 
 function makeReq(opts: {
   secretHeader?: string;
+  controlHeader?: string;
   twilioSignature?: string;
   url?: string;
   host?: string;
 } = {}): IncomingMessage {
   const headers: Record<string, string> = {};
   if (opts.secretHeader) headers["x-asterisk-secret"] = opts.secretHeader;
+  if (opts.controlHeader) headers["x-control-secret"] = opts.controlHeader;
   if (opts.twilioSignature) headers["x-twilio-signature"] = opts.twilioSignature;
   if (opts.host) headers.host = opts.host;
   return {
@@ -68,4 +71,11 @@ test("hasValidTwilioSignature rejects invalid signature", () => {
     hasValidTwilioSignature(req, formBody, "test-token", "https://voice.example.com"),
     false,
   );
+});
+
+test("hasValidControlSecret enforces x-control-secret when configured", () => {
+  assert.equal(hasValidControlSecret(makeReq(), undefined), true);
+  assert.equal(hasValidControlSecret(makeReq(), "control"), false);
+  assert.equal(hasValidControlSecret(makeReq({ controlHeader: "wrong" }), "control"), false);
+  assert.equal(hasValidControlSecret(makeReq({ controlHeader: "control" }), "control"), true);
 });

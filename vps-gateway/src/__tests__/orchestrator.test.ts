@@ -182,3 +182,28 @@ test("onAudioFrame emits synthesized chunk to egress callback", async () => {
 
   assert.deepEqual(seen, [session.id]);
 });
+
+test("updateSessionControl changes mode and passthrough skips pipeline", async () => {
+  const { orchestrator, stt } = makeOrchestrator();
+  const session = orchestrator.onIncomingCall({
+    source: "twilio",
+    externalCallId: "CA901",
+    from: "+15550000009",
+    to: "+18005550199",
+    receivedAtMs: Date.now(),
+  });
+
+  const updated = orchestrator.updateSessionControl(session.id, { mode: "passthrough" });
+  assert.equal(updated?.mode, "passthrough");
+
+  await orchestrator.onAudioFrame({
+    sessionId: session.id,
+    source: "twilio",
+    sampleRateHz: 8000,
+    encoding: "mulaw",
+    timestampMs: Date.now(),
+    payload: Buffer.from([0x01, 0x02]),
+  });
+
+  assert.equal(stt.calls, 0);
+});

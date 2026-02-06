@@ -13,9 +13,11 @@ import {
   validateAsteriskMediaPayload,
 } from "../ingress/asterisk.js";
 import { wireTwilioMediaSocket } from "../ingress/twilio-media-stream.js";
-import { hasValidAsteriskSecret, hasValidTwilioSignature } from "./auth.js";
+import { hasValidAsteriskSecret, hasValidControlSecret, hasValidTwilioSignature } from "./auth.js";
 import type { Logger } from "./logger.js";
 import type { EgressStore } from "../pipeline/egress-store.js";
+import type { IngressSource, LanguageCode, SessionMode } from "../domain/types.js";
+import type { OpenClawBridge } from "../integrations/openclaw.js";
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
@@ -55,6 +57,8 @@ export function startHttpServer(
     readonly egressStore: EgressStore;
     readonly twilioAuthToken?: string;
     readonly publicBaseUrl?: string;
+    readonly controlApiSecret?: string;
+    readonly openClawBridge?: OpenClawBridge;
   },
 ): Server {
   const twilioWs = new WebSocketServer({ noServer: true });
@@ -79,6 +83,53 @@ export function startHttpServer(
 
       if (method === "GET" && pathname === "/metrics") {
         return writeJson(res, 200, { metrics: orchestrator.listMetrics() });
+      }
+
+      if (method === "POST" && pathname === "/sessions/control") {
+        if (!hasValidControlSecret(req, opts.controlApiSecret)) {
+          return writeJson(res, 403, { error: "forbidden" });
+        }
+        const payload = await readJsonBody(req);
+        if (!validateSessionControlPayload(payload)) {
+          return writeJson(res, 400, { error: "invalid_payload" });
+        }
+        const sessionId =
+          payload.sessionId ??
+          (payload.callId
+            ? orchestrator.resolveSessionIdByExternal(payload.source ?? "voipms", payload.callId)
+            : undefined);
+        if (!sessionId) {
+          return writeJson(res, 404, { error: "session_not_found" });
+        }
+        const updated = orchestrator.updateSessionControl(sessionId, {
+          mode: payload.mode,
+          sourceLanguage: payload.sourceLanguage,
+          targetLanguage: payload.targetLanguage,
+        });
+        if (!updated) {
+          return writeJson(res, 404, { error: "session_not_found" });
+        }
+        return writeJson(res, 200, { session: updated });
+      }
+
+      if (method === "POST" && pathname === "/openclaw/command") {
+        if (!hasValidControlSecret(req, opts.controlApiSecret)) {
+          return writeJson(res, 403, { error: "forbidden" });
+        }
+        const payload = await readJsonBody(req);
+        if (!validateOpenClawCommandPayload(payload)) {
+          return writeJson(res, 400, { error: "invalid_payload" });
+        }
+        if (!opts.openClawBridge) {
+          return writeJson(res, 503, { error: "openclaw_bridge_not_configured" });
+        }
+        await opts.openClawBridge.sendCommand(payload.command, {
+          sessionId: payload.sessionId,
+          callId: payload.callId,
+          source: payload.source,
+          issuedAtMs: Date.now(),
+        });
+        return writeJson(res, 202, { accepted: true });
       }
 
       if (method === "POST" && pathname === "/twilio/voice") {
@@ -197,4 +248,44 @@ export function startHttpServer(
   });
 
   return server;
+}
+
+type SessionControlPayload = {
+  sessionId?: string;
+  callId?: string;
+  source?: IngressSource;
+  mode?: SessionMode;
+  sourceLanguage?: LanguageCode;
+  targetLanguage?: LanguageCode;
+};
+
+type OpenClawCommandPayload = {
+  command: string;
+  sessionId?: string;
+  callId?: string;
+  source?: IngressSource;
+};
+
+function validateSessionControlPayload(payload: unknown): payload is SessionControlPayload {
+  if (!payload || typeof payload !== "object") return false;
+  const p = payload as Record<string, unknown>;
+  const hasLocator = typeof p.sessionId === "string" || typeof p.callId === "string";
+  const hasPatch =
+    p.mode !== undefined || p.sourceLanguage !== undefined || p.targetLanguage !== undefined;
+  const sourceOk = p.source === undefined || p.source === "voipms" || p.source === "twilio";
+  const modeOk =
+    p.mode === undefined || p.mode === "private_translation" || p.mode === "passthrough";
+  const sourceLanguageOk =
+    p.sourceLanguage === undefined || p.sourceLanguage === "en" || p.sourceLanguage === "es";
+  const targetLanguageOk =
+    p.targetLanguage === undefined || p.targetLanguage === "en" || p.targetLanguage === "es";
+
+  return hasLocator && hasPatch && sourceOk && modeOk && sourceLanguageOk && targetLanguageOk;
+}
+
+function validateOpenClawCommandPayload(payload: unknown): payload is OpenClawCommandPayload {
+  if (!payload || typeof payload !== "object") return false;
+  const p = payload as Record<string, unknown>;
+  const sourceOk = p.source === undefined || p.source === "voipms" || p.source === "twilio";
+  return typeof p.command === "string" && p.command.trim().length > 0 && sourceOk;
 }
