@@ -116,6 +116,7 @@ test("onAudioFrame processes pipeline without throwing", async () => {
 
   await orchestrator.onAudioFrame(frame);
   assert.equal(orchestrator.listSessions()[0]?.state, "active");
+  assert.equal(orchestrator.listMetrics().length, 1);
 });
 
 test("onAudioFrame throttles frames under min interval", async () => {
