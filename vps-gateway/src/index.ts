@@ -18,7 +18,7 @@ function main(): void {
     stt: providers.stt,
     translator: providers.translator,
     tts: providers.tts,
-    destination phoneE164: config.destination phoneE164,
+    destinationPhoneE164: config.destinationPhoneE164,
     minFrameIntervalMs: config.pipelineMinFrameIntervalMs,
     onTtsChunk: (chunk) => egressStore.enqueue(chunk),
   });
