@@ -5,9 +5,14 @@ export function hasValidAsteriskSecret(
   req: IncomingMessage,
   configuredSecret?: string,
 ): boolean {
-  if (!configuredSecret) return true;
-  const provided = req.headers["x-asterisk-secret"];
-  return typeof provided === "string" && provided === configuredSecret;
+  return hasMatchingHeaderSecret(req, "x-asterisk-secret", configuredSecret);
+}
+
+export function hasValidControlSecret(
+  req: IncomingMessage,
+  configuredSecret?: string,
+): boolean {
+  return hasMatchingHeaderSecret(req, "x-control-secret", configuredSecret);
 }
 
 export function hasValidTwilioSignature(
@@ -57,4 +62,14 @@ function safeEqual(left: string, right: string): boolean {
   const rightBuf = Buffer.from(right);
   if (leftBuf.length !== rightBuf.length) return false;
   return timingSafeEqual(leftBuf, rightBuf);
+}
+
+function hasMatchingHeaderSecret(
+  req: IncomingMessage,
+  headerName: string,
+  configuredSecret?: string,
+): boolean {
+  if (!configuredSecret) return true;
+  const provided = req.headers[headerName];
+  return typeof provided === "string" && provided === configuredSecret;
 }

@@ -2,6 +2,7 @@
 
 const baseUrl = (process.env.BASE_URL ?? "http://127.0.0.1:8080").replace(/\/$/, "");
 const asteriskSecret = process.env.ASTERISK_SHARED_SECRET;
+const controlSecret = process.env.CONTROL_API_SECRET;
 const strictEgress = process.env.STRICT_EGRESS === "1";
 const source = process.env.SMOKE_SOURCE ?? "voipms";
 const callId = process.env.SMOKE_CALL_ID ?? `sip-live-${Date.now()}`;
@@ -71,6 +72,22 @@ async function run() {
   const sessionId = inboundPayload.sessionId;
   if (typeof sessionId !== "string") throw new Error("/asterisk/inbound missing sessionId");
   log("asterisk-inbound", `session=${sessionId}`);
+
+  if (controlSecret) {
+    const control = await fetch(`${baseUrl}/sessions/control`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-control-secret": controlSecret,
+      },
+      body: JSON.stringify({
+        sessionId,
+        mode: "private_translation",
+      }),
+    });
+    if (!control.ok) throw new Error(`/sessions/control returned ${control.status}`);
+    log("session-control", "ok");
+  }
 
   const media = await fetch(`${baseUrl}/asterisk/media`, {
     method: "POST",

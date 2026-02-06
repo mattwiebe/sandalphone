@@ -19,6 +19,7 @@ function baseConfig(): AppConfig {
     pollyVoiceEs: "Lupe",
     egressMaxQueuePerSession: 64,
     stubSttText: undefined,
+    openClawBridgeTimeoutMs: 1200,
   };
 }
 

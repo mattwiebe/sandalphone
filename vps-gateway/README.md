@@ -12,6 +12,8 @@ Runnable gateway with:
 - Twilio media stream websocket upgrade path (`/twilio/stream`)
 - Asterisk inbound bridge endpoint (`/asterisk/inbound`)
 - Asterisk media ingestion endpoint (`/asterisk/media`)
+- Session control endpoint (`/sessions/control`)
+- OpenClaw command relay (`/openclaw/command`)
 - Provider factory with cloud/stub selection (AssemblyAI realtime, Google Translate v2, Polly Standard)
 
 ## Run
@@ -61,6 +63,7 @@ sandalphone test smoke
 sandalphone test quick
 sandalphone smoke live --base-url https://voice.yourdomain.com
 sandalphone urls
+sandalphone openclaw command --command "start research project on vendor pricing"
 sandalphone doctor deploy
 sandalphone doctor local
 sandalphone service print-unit
@@ -126,6 +129,8 @@ If auto-detection fails, run `tailscale funnel status`, copy the `https://...` h
 
 ## Current Endpoints
 - `GET /health`
+- `POST /sessions/control` (mode/language updates)
+- `POST /openclaw/command` (relay instructions to configured OpenClaw bridge)
 - `GET /sessions`
 - `GET /metrics`
 - `POST /twilio/voice` (form-encoded webhook)
@@ -249,6 +254,36 @@ Alternative payload:
 `POST /twilio/voice` expects Twilio form fields including `CallSid`, `From`, and `To`.
 It returns TwiML that immediately dials the configured outbound target phone E.164.
 
+### Session Control Contract
+`POST /sessions/control`
+
+```json
+{
+  "sessionId": "uuid",
+  "mode": "passthrough"
+}
+```
+
+Alternative locator:
+
+```json
+{
+  "callId": "sip-123",
+  "source": "voipms",
+  "mode": "private_translation"
+}
+```
+
+### OpenClaw Command Contract
+`POST /openclaw/command`
+
+```json
+{
+  "command": "research supplier options for Guadalajara logistics",
+  "source": "twilio"
+}
+```
+
 ## Env
 - `PORT` (default `8080`)
 - `OUTBOUND_TARGET_E164` (default `+15555550100`)
@@ -257,6 +292,7 @@ It returns TwiML that immediately dials the configured outbound target phone E.1
 - `VOIPMS_DID` (optional metadata for your VoIP.ms DID)
 - `LOG_LEVEL` (default `info`)
 - `ASTERISK_SHARED_SECRET` (recommended on public VPS; required as `x-asterisk-secret` header for `/asterisk/inbound` and `/asterisk/media` when set)
+- `CONTROL_API_SECRET` (recommended; required as `x-control-secret` header for `/sessions/control` and `/openclaw/command` when set)
 - `PIPELINE_MIN_FRAME_INTERVAL_MS` (default `400`; throttles STT calls per session to control API churn)
 - `EGRESS_MAX_QUEUE_PER_SESSION` (default `64`; bounds queued translated chunks per call)
 - `ASSEMBLYAI_API_KEY` (enables realtime AssemblyAI STT)
@@ -269,6 +305,9 @@ It returns TwiML that immediately dials the configured outbound target phone E.1
 - `STUB_STT_TEXT` (optional text emitted by stub STT provider for local e2e validation)
 - `TWILIO_AUTH_TOKEN` (optional; enables Twilio signature validation)
 - `PUBLIC_BASE_URL` (optional override for signature URL, e.g. `https://voice.yourdomain.com`)
+- `OPENCLAW_BRIDGE_URL` (optional HTTP endpoint for call/session events and command relay)
+- `OPENCLAW_BRIDGE_API_KEY` (optional bearer token for bridge endpoint)
+- `OPENCLAW_BRIDGE_TIMEOUT_MS` (default `1200`)
 To write to a non-default env file:
 
 ```bash
@@ -319,4 +358,20 @@ Print exact URLs to paste in Twilio console:
 sandalphone urls
 # or override explicitly
 sandalphone urls --base-url https://your-funnel-host.ts.net
+```
+
+## OpenClaw Command Relay
+If `OPENCLAW_BRIDGE_URL` is configured:
+
+```bash
+sandalphone openclaw command --command "queue research task for bilingual vendor shortlist"
+```
+
+Optional targeting:
+
+```bash
+sandalphone openclaw command \
+  --command "summarize current call and propose next questions" \
+  --session-id <session-id> \
+  --source twilio
 ```

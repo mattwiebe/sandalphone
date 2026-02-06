@@ -5,12 +5,21 @@ import { EgressStore } from "./pipeline/egress-store.js";
 import { makeProviders } from "./providers/factory.js";
 import { makeLogger } from "./server/logger.js";
 import { startHttpServer } from "./server/http.js";
+import { makeOpenClawBridge } from "./integrations/openclaw.js";
 
 function main(): void {
   const config = loadConfig(process.env);
   const logger = makeLogger(config.logLevel);
   const providers = makeProviders(config, logger);
   const egressStore = new EgressStore(config.egressMaxQueuePerSession);
+  const openClawBridge = config.openClawBridgeUrl
+    ? makeOpenClawBridge({
+        endpointUrl: config.openClawBridgeUrl,
+        apiKey: config.openClawBridgeApiKey,
+        timeoutMs: config.openClawBridgeTimeoutMs,
+        logger,
+      })
+    : undefined;
 
   const orchestrator = new VoiceOrchestrator({
     logger,
@@ -21,6 +30,9 @@ function main(): void {
     outboundTargetE164: config.outboundTargetE164,
     minFrameIntervalMs: config.pipelineMinFrameIntervalMs,
     onTtsChunk: (chunk) => egressStore.enqueue(chunk),
+    onSessionEvent: openClawBridge
+      ? (event) => openClawBridge.publishSessionEvent(event)
+      : undefined,
   });
 
   const server = startHttpServer(config.port, logger, orchestrator, {
@@ -28,6 +40,8 @@ function main(): void {
     egressStore,
     twilioAuthToken: config.twilioAuthToken,
     publicBaseUrl: config.publicBaseUrl,
+    controlApiSecret: config.controlApiSecret,
+    openClawBridge,
   });
 
   const shutdown = (signal: NodeJS.Signals): void => {
