@@ -20,7 +20,21 @@ function main(): void {
     destination phoneE164: config.destination phoneE164,
   });
 
-  startHttpServer(config.port, logger, orchestrator);
+  const server = startHttpServer(config.port, logger, orchestrator);
+
+  const shutdown = (signal: NodeJS.Signals): void => {
+    logger.info("shutdown signal received", { signal });
+    server.close((error) => {
+      if (error) {
+        logger.error("failed to close http server", { error: error.message });
+        process.exitCode = 1;
+      }
+      process.exit();
+    });
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 main();

@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { Server } from "node:http";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import type { VoiceOrchestrator } from "../pipeline/orchestrator.js";
@@ -45,7 +46,7 @@ export function startHttpServer(
   port: number,
   logger: Logger,
   orchestrator: VoiceOrchestrator,
-): void {
+): Server {
   const twilioWs = new WebSocketServer({ noServer: true });
 
   twilioWs.on("connection", (ws) => {
@@ -121,4 +122,6 @@ export function startHttpServer(
   server.listen(port, () => {
     logger.info("http server started", { port, twilioWsPath: "/twilio/stream" });
   });
+
+  return server;
 }
