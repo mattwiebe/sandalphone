@@ -178,11 +178,28 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
     process.stdout.write(`\n[sandalphone] wrote env file: ${envPath}\n`);
     process.stdout.write("[sandalphone] next steps:\n");
     process.stdout.write("  1. sandalphone doctor deploy\n");
-    process.stdout.write("  2. sandalphone service print-unit\n");
-    process.stdout.write("  3. sandalphone smoke live --base-url http://127.0.0.1:8080\n");
+
+    if (!updates.PUBLIC_BASE_URL) {
+      process.stdout.write("  2. Expose local service with a public HTTPS tunnel (Twilio cannot reach private IP:port)\n");
+      process.stdout.write("     Example with Tailscale Funnel:\n");
+      process.stdout.write("       tailscale funnel 8080\n");
+      process.stdout.write("       # then set PUBLIC_BASE_URL in .env to the shown https://... URL\n");
+    }
+
+    const publicBaseUrl = updates.PUBLIC_BASE_URL || "https://<your-public-funnel-domain>";
+    process.stdout.write("  3. Configure Twilio:\n");
+    process.stdout.write(`     - Voice webhook: ${publicBaseUrl}/twilio/voice\n`);
+    process.stdout.write(`     - Media stream WS: wss://${stripScheme(publicBaseUrl)}/twilio/stream\n`);
+    process.stdout.write("  4. Start service locally and run smoke:\n");
+    process.stdout.write("     - sandalphone start\n");
+    process.stdout.write(`     - sandalphone smoke live --base-url ${publicBaseUrl}\n`);
   } finally {
     rl.close();
   }
+}
+
+function stripScheme(url: string): string {
+  return url.replace(/^https?:\/\//, "");
 }
 
 async function prompt(

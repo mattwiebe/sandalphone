@@ -18,6 +18,7 @@ Runnable gateway with:
 1. Install deps: `npm install`
 2. Build once: `npm run build`
 3. Configure env interactively: `sandalphone install`
+   - Installer now prints Mac+tunnel guidance (including Tailscale Funnel) and exact Twilio webhook/media URLs.
 4. Use CLI: `sandalphone help`
 5. Typecheck: `sandalphone check`
 6. Tests: `sandalphone test`
