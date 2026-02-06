@@ -13,7 +13,7 @@ import {
   validateAsteriskMediaPayload,
 } from "../ingress/asterisk.js";
 import { wireTwilioMediaSocket } from "../ingress/twilio-media-stream.js";
-import { hasValidAsteriskSecret } from "./auth.js";
+import { hasValidAsteriskSecret, hasValidTwilioSignature } from "./auth.js";
 import type { Logger } from "./logger.js";
 import type { EgressStore } from "../pipeline/egress-store.js";
 
@@ -50,7 +50,12 @@ export function startHttpServer(
   port: number,
   logger: Logger,
   orchestrator: VoiceOrchestrator,
-  opts: { readonly asteriskSharedSecret?: string; readonly egressStore: EgressStore },
+  opts: {
+    readonly asteriskSharedSecret?: string;
+    readonly egressStore: EgressStore;
+    readonly twilioAuthToken?: string;
+    readonly publicBaseUrl?: string;
+  },
 ): Server {
   const twilioWs = new WebSocketServer({ noServer: true });
 
@@ -78,6 +83,9 @@ export function startHttpServer(
 
       if (method === "POST" && pathname === "/twilio/voice") {
         const body = await readFormBody(req);
+        if (!hasValidTwilioSignature(req, body, opts.twilioAuthToken, opts.publicBaseUrl)) {
+          return writeJson(res, 403, { error: "forbidden" });
+        }
         const result = handleTwilioInbound(orchestrator, body);
         res.statusCode = 200;
         res.setHeader("content-type", "application/xml");

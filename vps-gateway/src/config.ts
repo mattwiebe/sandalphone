@@ -12,6 +12,8 @@ export interface AppConfig {
   readonly pollyVoiceEs: string;
   readonly egressMaxQueuePerSession: number;
   readonly stubSttText?: string;
+  readonly twilioAuthToken?: string;
+  readonly publicBaseUrl?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -47,5 +49,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     pollyVoiceEs: env.POLLY_VOICE_ES ?? "Lupe",
     egressMaxQueuePerSession,
     stubSttText: env.STUB_STT_TEXT,
+    twilioAuthToken: env.TWILIO_AUTH_TOKEN,
+    publicBaseUrl: env.PUBLIC_BASE_URL,
   };
 }

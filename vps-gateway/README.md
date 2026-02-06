@@ -22,7 +22,8 @@ Runnable gateway with:
 4. Test: `npm test`
 5. Smoke tests only: `npm run test:smoke`
 6. Quick gate (typecheck + smoke): `npm run test:quick`
-5. Start dev server: `npm run dev`
+7. Live endpoint smoke against a running service: `npm run smoke:live`
+8. Start dev server: `npm run dev`
 
 ## Smoke Test
 With server running on port `8080`:
@@ -39,6 +40,27 @@ curl -sS -X POST http://localhost:8080/asterisk/media \
   -H 'content-type: application/json' \
   -d '{"callId":"sip-1","sampleRateHz":8000,"encoding":"mulaw","payloadBase64":"AQI="}'
 curl -sS http://localhost:8080/sessions
+```
+
+### Live Smoke Command
+Run against a running gateway (local or VPS):
+
+```bash
+BASE_URL=http://127.0.0.1:8080 npm run smoke:live
+```
+
+When Asterisk secret is enabled:
+
+```bash
+BASE_URL=https://voice.yourdomain.com \
+ASTERISK_SHARED_SECRET=your-secret \
+npm run smoke:live
+```
+
+Fail if egress has no chunk (`204`):
+
+```bash
+STRICT_EGRESS=1 npm run smoke:live
 ```
 
 ## Current Endpoints
@@ -72,6 +94,7 @@ curl -sS http://localhost:8080/sessions
 - `SIGINT` and `SIGTERM` are handled for clean service shutdown.
 - Missing provider keys degrade to stubs (except Polly, enabled by default unless `DISABLE_POLLY=1`).
 - For local E2E testing without cloud keys, set `STUB_STT_TEXT` and `DISABLE_POLLY=1`.
+- If `TWILIO_AUTH_TOKEN` is set, `/twilio/voice` enforces `X-Twilio-Signature`.
 
 ## Integration Contracts
 ### Asterisk Inbound Contract
@@ -172,3 +195,5 @@ It returns TwiML that immediately dials the configured destination phone E.164 t
 - `POLLY_VOICE_ES` (default `Lupe`)
 - `DISABLE_POLLY` (`1` forces local stub TTS provider)
 - `STUB_STT_TEXT` (optional text emitted by stub STT provider for local e2e validation)
+- `TWILIO_AUTH_TOKEN` (optional; enables Twilio signature validation)
+- `PUBLIC_BASE_URL` (optional override for signature URL, e.g. `https://voice.yourdomain.com`)
