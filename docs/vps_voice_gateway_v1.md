@@ -29,9 +29,9 @@ Scope: Always-on VPS voice gateway with SIP (VoIP.ms) + Twilio media streams, st
 ### Components
 - VPS (US West or TX):
   - Asterisk (SIP + RTP termination for VoIP.ms)
-  - Voice Gateway service (HTTP + WS)
-  - Audio Bus (mix/routing)
-  - Streaming STT/MT/TTS adapters
+  - Voice Gateway service (TypeScript, HTTP + WS)
+  - Audio Bus (TypeScript, mix/routing)
+  - Streaming STT/MT/TTS adapters (TypeScript)
 - Twilio: DID + Media Streams WebSocket
 - VoIP.ms: DID -> SIP (VPS)
 - Translation APIs:
@@ -74,6 +74,18 @@ Notes:
 - Instance: 4 vCPU / 8 GB RAM minimum.
 - Install: Ubuntu LTS.
 - DNS: provision A/AAAA for `voice.yourdomain.com`.
+
+### Implementation Base (TypeScript)
+- Runtime code lives in `/Users/matt/levi/vps-gateway`.
+- Entry point: `/Users/matt/levi/vps-gateway/src/index.ts`.
+- Dev run: `npm run dev` (after `npm install` in `/Users/matt/levi/vps-gateway`).
+- Implemented and smoke-tested endpoints:
+  - `GET /health`
+  - `GET /sessions`
+  - `POST /twilio/voice`
+  - `POST /asterisk/inbound`
+  - `POST /asterisk/media`
+  - `WS /twilio/stream`
 
 ### 1) Install Asterisk
 - Install Asterisk + PJSIP modules.
@@ -158,4 +170,3 @@ b) v1.2: Multi-number routing + OpenClaw Canvas HUD
 - Asterisk dialplan design (single vs multi bridge).
 - SIP security (IP allowlist, fail2ban).
 - Whether to host SIP and WebSocket on same IP.
-
