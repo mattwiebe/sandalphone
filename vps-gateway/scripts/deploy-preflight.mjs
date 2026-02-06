@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 
-const required = ["DESTINATION_PHONE_E164"];
 const optionalCloud = ["ASSEMBLYAI_API_KEY", "GOOGLE_TRANSLATE_API_KEY"];
 const warnings = [];
 const failures = [];
 
-for (const key of required) {
-  if (!process.env[key]) failures.push(`${key} is required`);
+const outboundTarget = process.env.OUTBOUND_TARGET_E164 ?? process.env.DESTINATION_PHONE_E164 ?? "";
+if (!outboundTarget) {
+  failures.push("OUTBOUND_TARGET_E164 is required (legacy fallback: DESTINATION_PHONE_E164)");
 }
-
-const destinationPhone = process.env.DESTINATION_PHONE_E164 ?? "";
-if (destinationPhone && !/^\+[1-9]\d{7,14}$/.test(destinationPhone)) {
-  failures.push("DESTINATION_PHONE_E164 must be E.164 format, e.g. +15555550100");
+if (outboundTarget && !/^\+[1-9]\d{7,14}$/.test(outboundTarget)) {
+  failures.push(
+    "OUTBOUND_TARGET_E164 must be E.164 format, e.g. +15555550100 (legacy fallback: DESTINATION_PHONE_E164)",
+  );
+}
+if (!process.env.OUTBOUND_TARGET_E164 && process.env.DESTINATION_PHONE_E164) {
+  warnings.push("Using legacy DESTINATION_PHONE_E164; migrate to OUTBOUND_TARGET_E164");
 }
 
 if (process.env.TWILIO_AUTH_TOKEN && !process.env.PUBLIC_BASE_URL) {

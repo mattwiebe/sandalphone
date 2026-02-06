@@ -239,11 +239,12 @@ Alternative payload:
 
 ### Twilio Voice Contract
 `POST /twilio/voice` expects Twilio form fields including `CallSid`, `From`, and `To`.
-It returns TwiML that immediately dials the configured destination phone E.164 target.
+It returns TwiML that immediately dials the configured outbound target phone E.164.
 
 ## Env
 - `PORT` (default `8080`)
-- `DESTINATION_PHONE_E164` (default `+15555550100`)
+- `OUTBOUND_TARGET_E164` (default `+15555550100`)
+- `DESTINATION_PHONE_E164` (legacy fallback only; migrate to `OUTBOUND_TARGET_E164`)
 - `TWILIO_PHONE_NUMBER` (optional metadata for your Twilio DID)
 - `VOIPMS_DID` (optional metadata for your VoIP.ms DID)
 - `LOG_LEVEL` (default `info`)

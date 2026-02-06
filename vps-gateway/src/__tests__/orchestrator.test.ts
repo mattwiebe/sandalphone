@@ -56,7 +56,7 @@ function makeOrchestrator(minFrameIntervalMs = 0, onTtsChunk?: (sessionId: strin
       stt,
       translator: new StubTranslator(),
       tts: new StubTts(),
-      destinationPhoneE164: "+15555550100",
+      outboundTargetE164: "+15555550100",
       minFrameIntervalMs,
       onTtsChunk: (chunk) => onTtsChunk?.(chunk.sessionId),
     }),
