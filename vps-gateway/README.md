@@ -119,3 +119,4 @@ It returns TwiML that immediately dials the configured destination phone E.164 t
 - `DESTINATION_PHONE_E164` (default `+15555550100`)
 - `LOG_LEVEL` (default `info`)
 - `ASTERISK_SHARED_SECRET` (recommended on public VPS; required as `x-asterisk-secret` header for `/asterisk/inbound` and `/asterisk/media` when set)
+- `PIPELINE_MIN_FRAME_INTERVAL_MS` (default `400`; throttles STT calls per session to control API churn)

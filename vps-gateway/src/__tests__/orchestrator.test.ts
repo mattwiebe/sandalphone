@@ -7,7 +7,9 @@ import type { AudioFrame, IncomingCallEvent } from "../domain/types.js";
 
 class StubStt {
   public readonly name = "stub-stt";
+  public calls = 0;
   public async transcribe() {
+    this.calls += 1;
     return {
       sessionId: "ignored",
       text: "hola",
@@ -44,19 +46,24 @@ class StubTts {
   }
 }
 
-function makeOrchestrator() {
-  return new VoiceOrchestrator({
-    logger: makeLogger("error"),
-    sessionStore: new SessionStore(),
-    stt: new StubStt(),
-    translator: new StubTranslator(),
-    tts: new StubTts(),
-    destination phoneE164: "+15555550100",
-  });
+function makeOrchestrator(minFrameIntervalMs = 0) {
+  const stt = new StubStt();
+  return {
+    stt,
+    orchestrator: new VoiceOrchestrator({
+      logger: makeLogger("error"),
+      sessionStore: new SessionStore(),
+      stt,
+      translator: new StubTranslator(),
+      tts: new StubTts(),
+      destination phoneE164: "+15555550100",
+      minFrameIntervalMs,
+    }),
+  };
 }
 
 test("onIncomingCall de-duplicates external call IDs", () => {
-  const orchestrator = makeOrchestrator();
+  const { orchestrator } = makeOrchestrator();
   const call: IncomingCallEvent = {
     source: "twilio",
     externalCallId: "CA123",
@@ -73,7 +80,7 @@ test("onIncomingCall de-duplicates external call IDs", () => {
 });
 
 test("resolveSessionIdByExternal returns mapped session", () => {
-  const orchestrator = makeOrchestrator();
+  const { orchestrator } = makeOrchestrator();
   const call: IncomingCallEvent = {
     source: "voipms",
     externalCallId: "sip-1",
@@ -88,7 +95,7 @@ test("resolveSessionIdByExternal returns mapped session", () => {
 });
 
 test("onAudioFrame processes pipeline without throwing", async () => {
-  const orchestrator = makeOrchestrator();
+  const { orchestrator } = makeOrchestrator();
   const call: IncomingCallEvent = {
     source: "twilio",
     externalCallId: "CA555",
@@ -109,4 +116,44 @@ test("onAudioFrame processes pipeline without throwing", async () => {
 
   await orchestrator.onAudioFrame(frame);
   assert.equal(orchestrator.listSessions()[0]?.state, "active");
+});
+
+test("onAudioFrame throttles frames under min interval", async () => {
+  const { orchestrator, stt } = makeOrchestrator(100);
+  const call: IncomingCallEvent = {
+    source: "twilio",
+    externalCallId: "CA777",
+    from: "+15550000007",
+    to: "+18005550199",
+    receivedAtMs: Date.now(),
+  };
+  const session = orchestrator.onIncomingCall(call);
+  const now = Date.now();
+
+  await orchestrator.onAudioFrame({
+    sessionId: session.id,
+    source: "twilio",
+    sampleRateHz: 8000,
+    encoding: "mulaw",
+    timestampMs: now,
+    payload: Buffer.from([0x01]),
+  });
+  await orchestrator.onAudioFrame({
+    sessionId: session.id,
+    source: "twilio",
+    sampleRateHz: 8000,
+    encoding: "mulaw",
+    timestampMs: now + 50,
+    payload: Buffer.from([0x02]),
+  });
+  await orchestrator.onAudioFrame({
+    sessionId: session.id,
+    source: "twilio",
+    sampleRateHz: 8000,
+    encoding: "mulaw",
+    timestampMs: now + 150,
+    payload: Buffer.from([0x03]),
+  });
+
+  assert.equal(stt.calls, 2);
 });
