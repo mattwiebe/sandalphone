@@ -35,6 +35,10 @@ async function main(argv: string[]): Promise<void> {
   };
 
   const [command, ...rest] = argv;
+  if (command === "--version" || command === "-v" || command === "version") {
+    process.stdout.write(`${cliVersion()}\n`);
+    return;
+  }
   if (!command || command === "help" || command === "--help" || command === "-h") {
     printHelp();
     return;
@@ -583,7 +587,11 @@ function die(message: string): never {
 }
 
 function printHelp(): void {
-  process.stdout.write(`sandalphone: VPS gateway operator CLI\n\n`);
+  process.stdout.write(`sandalphone ${cliVersion()}\n\n`);
+  process.stdout.write(`Invocation:\n`);
+  process.stdout.write(`  Global: sandalphone <command>\n`);
+  process.stdout.write(`  Local:  node dist/cli.js <command>\n`);
+  process.stdout.write(`  If global command is missing: cd /Users/matt/levi/vps-gateway && npm link\n\n`);
   process.stdout.write(`Usage:\n`);
   process.stdout.write(`  sandalphone install [--env-path PATH]\n`);
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
@@ -614,6 +622,16 @@ function printServiceHelp(): void {
   process.stdout.write(`  sandalphone service restart\n`);
   process.stdout.write(`  sandalphone service status\n`);
   process.stdout.write(`  sandalphone service logs [--lines N]\n`);
+}
+
+function cliVersion(): string {
+  try {
+    const pkgPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+    const parsed = JSON.parse(readFileSync(pkgPath, "utf8")) as { version?: string };
+    return parsed.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
 }
 
 void main(process.argv.slice(2)).catch((error) => {
