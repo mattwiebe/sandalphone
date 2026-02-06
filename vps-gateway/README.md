@@ -80,6 +80,7 @@ STRICT_EGRESS=1 npm run smoke:live
 3. Create env file:
    - `cp .env.example .env`
    - Set `DESTINATION_PHONE_E164` and cloud credentials.
+   - Run `npm run deploy:preflight`
 4. Start service:
    - `npm run docker:up`
 5. Verify:
@@ -88,6 +89,10 @@ STRICT_EGRESS=1 npm run smoke:live
    - Twilio voice webhook -> `POST /twilio/voice`
    - Twilio media stream websocket -> `WS /twilio/stream`
    - Asterisk bridge -> `POST /asterisk/inbound` and `POST /asterisk/media`
+
+### Deployment Templates
+- `deploy/systemd/levi-vps-gateway.service` for non-container systemd deployments
+- `deploy/nginx/voice-gateway.conf` reverse-proxy baseline (includes WebSocket upgrade headers)
 
 ## Runtime Notes
 - This scaffold is stateless in-memory; restart loses active sessions.

@@ -79,6 +79,8 @@ Notes:
 - Runtime code lives in `/Users/matt/levi/vps-gateway`.
 - Entry point: `/Users/matt/levi/vps-gateway/src/index.ts`.
 - Dev run: `npm run dev` (after `npm install` in `/Users/matt/levi/vps-gateway`).
+- Live endpoint smoke check: `BASE_URL=https://voice.yourdomain.com npm run smoke:live`.
+- VPS env sanity check: `npm run deploy:preflight`.
 - Implemented and smoke-tested endpoints:
   - `GET /health`
   - `GET /sessions`
