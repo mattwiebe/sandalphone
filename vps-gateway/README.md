@@ -26,6 +26,43 @@ Runnable gateway with:
 6. Tests: `sandalphone test`
 7. Start dev server: `sandalphone dev`
 
+## VPS Install (Ubuntu 22.04 + Tailscale Funnel)
+One-shot installer (runs as root, uses SSH repo clone):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mattwiebe/sandalphone/main/vps-gateway/scripts/install-vps.sh | sudo bash
+```
+
+Required env (pass as inline env vars to the command above):
+- `OUTBOUND_TARGET_E164` (the phone Sandalphone should dial)
+- `TAILSCALE_AUTHKEY` (Tailscale auth key with reuse enabled)
+
+Recommended env:
+- `TWILIO_AUTH_TOKEN`
+- `ASSEMBLYAI_API_KEY`
+- `GOOGLE_TRANSLATE_API_KEY`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `OPENCLAW_BRIDGE_URL` (if you want OpenClaw integration)
+
+Example:
+
+```bash
+OUTBOUND_TARGET_E164=+15555550100 \
+TAILSCALE_AUTHKEY=tskey-... \
+TWILIO_AUTH_TOKEN=... \
+ASSEMBLYAI_API_KEY=... \
+GOOGLE_TRANSLATE_API_KEY=... \
+AWS_ACCESS_KEY_ID=... \
+AWS_SECRET_ACCESS_KEY=... \
+curl -fsSL https://raw.githubusercontent.com/mattwiebe/sandalphone/main/vps-gateway/scripts/install-vps.sh | sudo bash
+```
+
+Notes:
+- The installer attempts `tailscale funnel --bg --yes 8080` and auto-detects the public URL.
+- If Funnel is not enabled for the tailnet, enable it at https://login.tailscale.com/f/funnel then re-run.
+- The systemd unit is installed as `sandalphone-vps-gateway`.
+
 ## CLI
 Primary operator surface:
 
