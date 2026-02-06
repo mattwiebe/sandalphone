@@ -61,12 +61,12 @@ If you need to manually manage launchd services:
 
 ```bash
 # Load services
-launchctl load ~/Library/LaunchAgents/com.levi.mac-backend.plist
-launchctl load ~/Library/LaunchAgents/com.levi.telegram-bot.plist
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.levi.mac-backend.plist
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.levi.telegram-bot.plist
 
 # Unload services
-launchctl unload ~/Library/LaunchAgents/com.levi.mac-backend.plist
-launchctl unload ~/Library/LaunchAgents/com.levi.telegram-bot.plist
+launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/com.levi.mac-backend.plist
+launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/com.levi.telegram-bot.plist
 
 # View service status
 launchctl list | grep levi
@@ -93,13 +93,29 @@ log show --predicate 'subsystem == "com.apple.launchd"' --last 5m | grep levi
 ./scripts/manage-services.sh restart
 ```
 
-**Clear old processes**
+**Quick restart (kickstart)**
 ```bash
-# Kill any stray processes
-pkill -f "python.*main.py"
-pkill -f "python.*telegram_bot.py"
+launchctl kickstart -k "gui/$(id -u)/com.levi.mac-backend"
+launchctl kickstart -k "gui/$(id -u)/com.levi.telegram-bot"
+```
+
+**Clear old processes (preferred)**
+```bash
+# LaunchAgents with KeepAlive will respawn on kill,
+# so bootout first, then restart.
+./scripts/manage-services.sh stop
 
 # Then restart services
+./scripts/manage-services.sh start
+```
+
+**Clear old processes (last resort)**
+```bash
+# Only use if launchctl bootout/stop didn't work
+launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/com.levi.mac-backend.plist
+launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/com.levi.telegram-bot.plist
+pkill -f "python.*main.py"
+pkill -f "python.*telegram_bot.py"
 ./scripts/manage-services.sh start
 ```
 
