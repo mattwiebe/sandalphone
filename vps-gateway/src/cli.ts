@@ -7,6 +7,7 @@ import { createInterface } from "node:readline/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyEnvUpdates, parseEnvFile, type EnvMap } from "./cli-env-file.js";
+import { extractFunnelUrl } from "./cli-funnel.js";
 
 type Dict = Record<string, string | undefined>;
 
@@ -19,6 +20,13 @@ type PromptOptions = {
   required?: boolean;
   secret?: boolean;
   validate?: (value: string) => string | undefined;
+};
+
+type CommandResult = {
+  status: number;
+  stdout: string;
+  stderr: string;
+  error?: Error;
 };
 
 async function main(argv: string[]): Promise<void> {
@@ -58,6 +66,10 @@ async function main(argv: string[]): Promise<void> {
     }
     case "service": {
       handleService(rest, context);
+      return;
+    }
+    case "funnel": {
+      handleFunnel(rest, context);
       return;
     }
     default: {
@@ -175,31 +187,149 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
     const mergedText = applyEnvUpdates(currentText, updates);
     writeFileSync(envPath, mergedText.endsWith("\n") ? mergedText : `${mergedText}\n`, "utf8");
 
+    let publicBaseUrl = updates.PUBLIC_BASE_URL;
+    if (!publicBaseUrl) {
+      const enableFunnel = await promptYesNo(
+        rl,
+        "Set up Tailscale Funnel now and auto-fill PUBLIC_BASE_URL?",
+        false,
+      );
+      if (enableFunnel) {
+        const url = setupFunnelAndPersistEnv(context, updates.PORT, envPath);
+        if (url) publicBaseUrl = url;
+      }
+    }
+
     process.stdout.write(`\n[sandalphone] wrote env file: ${envPath}\n`);
     process.stdout.write("[sandalphone] next steps:\n");
     process.stdout.write("  1. sandalphone doctor deploy\n");
 
-    if (!updates.PUBLIC_BASE_URL) {
+    if (!publicBaseUrl) {
       process.stdout.write("  2. Expose local service with a public HTTPS tunnel (Twilio cannot reach private IP:port)\n");
       process.stdout.write("     Example with Tailscale Funnel:\n");
-      process.stdout.write("       tailscale funnel 8080\n");
+      process.stdout.write(`       sandalphone funnel up --port ${updates.PORT}\n`);
       process.stdout.write("       # then set PUBLIC_BASE_URL in .env to the shown https://... URL\n");
     }
 
-    const publicBaseUrl = updates.PUBLIC_BASE_URL || "https://<your-public-funnel-domain>";
+    const base = publicBaseUrl || "https://<your-public-funnel-domain>";
     process.stdout.write("  3. Configure Twilio:\n");
-    process.stdout.write(`     - Voice webhook: ${publicBaseUrl}/twilio/voice\n`);
-    process.stdout.write(`     - Media stream WS: wss://${stripScheme(publicBaseUrl)}/twilio/stream\n`);
+    process.stdout.write(`     - Voice webhook: ${base}/twilio/voice\n`);
+    process.stdout.write(`     - Media stream WS: wss://${stripScheme(base)}/twilio/stream\n`);
     process.stdout.write("  4. Start service locally and run smoke:\n");
     process.stdout.write("     - sandalphone start\n");
-    process.stdout.write(`     - sandalphone smoke live --base-url ${publicBaseUrl}\n`);
+    process.stdout.write(`     - sandalphone smoke live --base-url ${base}\n`);
   } finally {
     rl.close();
   }
 }
 
-function stripScheme(url: string): string {
-  return url.replace(/^https?:\/\//, "");
+function handleFunnel(args: string[], context: CliContext): void {
+  const action = args[0] ?? "help";
+
+  if (action === "help") {
+    printFunnelHelp();
+    return;
+  }
+
+  if (action === "up") {
+    const { flags } = parseFlags(args.slice(1));
+    const port = flags.port ?? "8080";
+    const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+
+    const url = setupFunnelAndPersistEnv(context, port, envPath, {
+      bg: flags.bg !== "0" && flags.bg !== "false",
+      yes: flags.yes !== "0" && flags.yes !== "false",
+    });
+
+    if (!url) {
+      die("funnel configured but could not detect public URL; run `sandalphone funnel status` and set PUBLIC_BASE_URL manually");
+    }
+
+    process.stdout.write(`[sandalphone] PUBLIC_BASE_URL updated to ${url} in ${envPath}\n`);
+    process.stdout.write(`[sandalphone] Twilio voice webhook: ${url}/twilio/voice\n`);
+    process.stdout.write(`[sandalphone] Twilio media stream: wss://${stripScheme(url)}/twilio/stream\n`);
+    return;
+  }
+
+  if (action === "status") {
+    const result = runCommandCapture("tailscale", ["funnel", "status", "--json"]);
+    if (result.status !== 0) {
+      process.stderr.write(result.stderr);
+      die("failed to read funnel status (is tailscaled running?)");
+    }
+
+    const url = extractFunnelUrl(result.stdout);
+    if (url) {
+      process.stdout.write(`[sandalphone] funnel url: ${url}\n`);
+    } else {
+      process.stdout.write("[sandalphone] funnel active but URL not detected from status json\n");
+    }
+
+    process.stdout.write(result.stdout.endsWith("\n") ? result.stdout : `${result.stdout}\n`);
+    return;
+  }
+
+  if (action === "reset" || action === "down") {
+    const { flags } = parseFlags(args.slice(1));
+    const result = runCommandCapture("tailscale", ["funnel", "reset"]);
+    if (result.status !== 0) {
+      process.stderr.write(result.stderr);
+      die("failed to reset funnel");
+    }
+    process.stdout.write(result.stdout);
+
+    if (flags["clear-env"] === "1" || flags["clear-env"] === "true") {
+      const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+      updateEnvFile(envPath, { PUBLIC_BASE_URL: "" }, context.projectRoot);
+      process.stdout.write(`[sandalphone] cleared PUBLIC_BASE_URL in ${envPath}\n`);
+    }
+    return;
+  }
+
+  die(`unknown funnel action: ${action}`);
+}
+
+function setupFunnelAndPersistEnv(
+  context: CliContext,
+  port: string,
+  envPath: string,
+  opts: { bg?: boolean; yes?: boolean } = {},
+): string | undefined {
+  const args = ["funnel"];
+  if (opts.bg ?? true) args.push("--bg");
+  if (opts.yes ?? true) args.push("--yes");
+  args.push(port);
+
+  const up = runCommandCapture("tailscale", args);
+  if (up.status !== 0) {
+    process.stderr.write(up.stderr);
+    die("failed to start tailscale funnel");
+  }
+  process.stdout.write(up.stdout);
+
+  const status = runCommandCapture("tailscale", ["funnel", "status", "--json"]);
+  if (status.status !== 0) {
+    process.stderr.write(status.stderr);
+    return undefined;
+  }
+
+  const url = extractFunnelUrl(status.stdout);
+  if (!url) return undefined;
+
+  updateEnvFile(envPath, { PUBLIC_BASE_URL: url }, context.projectRoot);
+  return url;
+}
+
+function updateEnvFile(envPath: string, updates: EnvMap, projectRoot: string): void {
+  const templatePath = resolve(projectRoot, ".env.example");
+  const sourceText = existsSync(envPath)
+    ? readFileSync(envPath, "utf8")
+    : existsSync(templatePath)
+      ? readFileSync(templatePath, "utf8")
+      : "";
+
+  const merged = applyEnvUpdates(sourceText, updates);
+  writeFileSync(envPath, merged.endsWith("\n") ? merged : `${merged}\n`, "utf8");
 }
 
 async function prompt(
@@ -241,6 +371,25 @@ async function prompt(
     }
 
     return value;
+  }
+}
+
+async function promptYesNo(
+  rl: ReturnType<typeof createInterface>,
+  label: string,
+  defaultYes: boolean,
+): Promise<boolean> {
+  const defaultToken = defaultYes ? "Y/n" : "y/N";
+
+  while (true) {
+    const raw = await rl.question(`${label} [${defaultToken}]: `);
+    const normalized = raw.trim().toLowerCase();
+
+    if (!normalized) return defaultYes;
+    if (normalized === "y" || normalized === "yes") return true;
+    if (normalized === "n" || normalized === "no") return false;
+
+    process.stdout.write("  enter y or n\n");
   }
 }
 
@@ -403,6 +552,30 @@ function runCommand(
   process.exit(result.status ?? 1);
 }
 
+function runCommandCapture(
+  command: string,
+  args: string[],
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+): CommandResult {
+  const result = spawnSync(command, args, {
+    cwd: opts.cwd,
+    env: opts.env,
+    encoding: "utf8",
+    stdio: "pipe",
+  });
+
+  return {
+    status: result.status ?? 1,
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? "",
+    error: result.error ?? undefined,
+  };
+}
+
+function stripScheme(url: string): string {
+  return url.replace(/^https?:\/\//, "");
+}
+
 function die(message: string): never {
   process.stderr.write(`[sandalphone] ${message}\n`);
   process.stderr.write("[sandalphone] run `sandalphone help` for usage\n");
@@ -416,10 +589,20 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
   process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
+  process.stdout.write(`  sandalphone funnel <action>\n`);
   process.stdout.write(`  sandalphone doctor deploy\n`);
   process.stdout.write(`  sandalphone service <action>\n\n`);
   process.stdout.write(`Legacy alias: levi <command>\n\n`);
+  printFunnelHelp();
   printServiceHelp();
+}
+
+function printFunnelHelp(): void {
+  process.stdout.write(`Funnel actions:\n`);
+  process.stdout.write(`  sandalphone funnel up [--port 8080] [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone funnel status\n`);
+  process.stdout.write(`  sandalphone funnel reset [--clear-env] [--env-path .env]\n`);
+  process.stdout.write(`\n`);
 }
 
 function printServiceHelp(): void {
