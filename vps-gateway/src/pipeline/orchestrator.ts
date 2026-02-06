@@ -123,6 +123,10 @@ export class VoiceOrchestrator {
     return this.deps.sessionStore.all();
   }
 
+  public listMetrics(): SessionMetrics[] {
+    return [...this.metrics.values()];
+  }
+
   private trackMetrics(sessionId: string, delta: SessionMetrics): void {
     const previous = this.metrics.get(sessionId) ?? { sessionId };
     this.metrics.set(sessionId, {

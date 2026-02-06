@@ -42,6 +42,7 @@ curl -sS http://localhost:8080/sessions
 ## Current Endpoints
 - `GET /health`
 - `GET /sessions`
+- `GET /metrics`
 - `POST /twilio/voice` (form-encoded webhook)
 - `POST /asterisk/inbound` (JSON bridge payload)
 - `POST /asterisk/media` (JSON audio frame payload)

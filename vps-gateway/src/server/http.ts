@@ -68,6 +68,10 @@ export function startHttpServer(
         return writeJson(res, 200, { sessions: orchestrator.listSessions() });
       }
 
+      if (method === "GET" && pathname === "/metrics") {
+        return writeJson(res, 200, { metrics: orchestrator.listMetrics() });
+      }
+
       if (method === "POST" && pathname === "/twilio/voice") {
         const body = await readFormBody(req);
         const result = handleTwilioInbound(orchestrator, body);
