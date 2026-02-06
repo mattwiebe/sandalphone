@@ -16,6 +16,7 @@ Runnable scaffold with:
 
 ## Run
 1. Install deps: `npm install`
+2. Copy envs: `cp .env.example .env` and set values
 2. Typecheck: `npm run check`
 3. Build: `npm run build`
 4. Test: `npm test`
@@ -45,6 +46,26 @@ curl -sS http://localhost:8080/sessions
 - `POST /asterisk/inbound` (JSON bridge payload)
 - `POST /asterisk/media` (JSON audio frame payload)
 - `WS /twilio/stream` (Twilio media stream)
+
+## Deploy (VPS)
+1. Install Docker + Compose plugin on VPS.
+2. Clone repo and move into `/Users/matt/levi/vps-gateway`.
+3. Create env file:
+   - `cp .env.example .env`
+   - Set `DESTINATION_PHONE_E164` and cloud credentials.
+4. Start service:
+   - `npm run docker:up`
+5. Verify:
+   - `curl -sS http://localhost:8080/health`
+6. Point providers to VPS:
+   - Twilio voice webhook -> `POST /twilio/voice`
+   - Twilio media stream websocket -> `WS /twilio/stream`
+   - Asterisk bridge -> `POST /asterisk/inbound` and `POST /asterisk/media`
+
+## Runtime Notes
+- This scaffold is stateless in-memory; restart loses active sessions.
+- `SIGINT` and `SIGTERM` are handled for clean service shutdown.
+- Provider clients are currently stubs; env vars are prepared for the next integration slice.
 
 ## Integration Contracts
 ### Asterisk Inbound Contract
