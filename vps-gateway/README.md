@@ -114,6 +114,7 @@ sandalphone funnel reset --clear-env
 ```
 
 `sandalphone funnel up` writes detected URL into `.env` as `PUBLIC_BASE_URL`.
+If auto-detection fails, run `tailscale funnel status`, copy the `https://...` host, and paste it into `PUBLIC_BASE_URL`.
 
 ## Current Endpoints
 - `GET /health`

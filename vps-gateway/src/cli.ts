@@ -7,7 +7,7 @@ import { createInterface } from "node:readline/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyEnvUpdates, parseEnvFile, type EnvMap } from "./cli-env-file.js";
-import { extractFunnelUrl } from "./cli-funnel.js";
+import { extractFunnelUrl, extractFunnelUrlFromText } from "./cli-funnel.js";
 
 type Dict = Record<string, string | undefined>;
 
@@ -27,6 +27,7 @@ type CommandResult = {
   stdout: string;
   stderr: string;
   error?: Error;
+  timedOut?: boolean;
 };
 
 async function main(argv: string[]): Promise<void> {
@@ -142,9 +143,8 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         detectedPublicBaseUrl = url;
         process.stdout.write(`[sandalphone] detected funnel URL: ${url}\n`);
       } else {
-        process.stdout.write(
-          "[sandalphone] funnel configured but URL was not detected automatically; enter it manually next\n",
-        );
+        process.stdout.write("[sandalphone] funnel configured but URL was not detected automatically\n");
+        printManualFunnelUrlSteps(selectedPort);
       }
     }
 
@@ -222,6 +222,7 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       process.stdout.write("     Example with Tailscale Funnel:\n");
       process.stdout.write(`       sandalphone funnel up --port ${updates.PORT}\n`);
       process.stdout.write("       # then set PUBLIC_BASE_URL in .env to the shown https://... URL\n");
+      printManualFunnelUrlSteps(updates.PORT);
     }
 
     const base = publicBaseUrl || "https://<your-public-funnel-domain>";
@@ -308,29 +309,64 @@ function setupFunnelAndPersistEnv(
   envPath: string,
   opts: { bg?: boolean; yes?: boolean } = {},
 ): string | undefined {
+  process.stdout.write("[sandalphone] configuring Tailscale Funnel...\n");
   const args = ["funnel"];
   if (opts.bg ?? true) args.push("--bg");
   if (opts.yes ?? true) args.push("--yes");
   args.push(port);
 
-  const up = runCommandCapture("tailscale", args);
+  const up = runCommandCapture("tailscale", args, { timeoutMs: 15000 });
+  if (up.timedOut) {
+    process.stderr.write(
+      "[sandalphone] tailscale funnel timed out; run `sandalphone funnel up --port " +
+        `${port}` +
+        "` manually in another terminal\n",
+    );
+    return undefined;
+  }
   if (up.status !== 0) {
     process.stderr.write(up.stderr);
     die("failed to start tailscale funnel");
   }
   process.stdout.write(up.stdout);
 
-  const status = runCommandCapture("tailscale", ["funnel", "status", "--json"]);
+  process.stdout.write("[sandalphone] reading funnel status...\n");
+  const status = runCommandCapture("tailscale", ["funnel", "status", "--json"], { timeoutMs: 7000 });
+  if (status.timedOut) {
+    process.stderr.write(
+      "[sandalphone] tailscale funnel status timed out; run `sandalphone funnel status` manually\n",
+    );
+    return undefined;
+  }
   if (status.status !== 0) {
     process.stderr.write(status.stderr);
-    return undefined;
+    return detectFunnelUrlFromPlainStatus();
   }
 
   const url = extractFunnelUrl(status.stdout);
-  if (!url) return undefined;
+  if (!url) {
+    const plain = detectFunnelUrlFromPlainStatus();
+    if (!plain) return undefined;
+    updateEnvFile(envPath, { PUBLIC_BASE_URL: plain }, context.projectRoot);
+    return plain;
+  }
 
   updateEnvFile(envPath, { PUBLIC_BASE_URL: url }, context.projectRoot);
   return url;
+}
+
+function detectFunnelUrlFromPlainStatus(): string | undefined {
+  const plain = runCommandCapture("tailscale", ["funnel", "status"], { timeoutMs: 7000 });
+  if (plain.status !== 0) return undefined;
+  if (plain.stdout) process.stdout.write(plain.stdout);
+  return extractFunnelUrlFromText(plain.stdout);
+}
+
+function printManualFunnelUrlSteps(port: string): void {
+  process.stdout.write("  manual URL discovery:\n");
+  process.stdout.write(`    1) tailscale funnel up --port ${port}\n`);
+  process.stdout.write("    2) tailscale funnel status\n");
+  process.stdout.write("    3) copy the https://... host and paste it as PUBLIC_BASE_URL\n");
 }
 
 function updateEnvFile(envPath: string, updates: EnvMap, projectRoot: string): void {
@@ -568,13 +604,15 @@ function runCommand(
 function runCommandCapture(
   command: string,
   args: string[],
-  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
 ): CommandResult {
   const result = spawnSync(command, args, {
     cwd: opts.cwd,
     env: opts.env,
     encoding: "utf8",
     stdio: "pipe",
+    timeout: opts.timeoutMs,
+    killSignal: "SIGTERM",
   });
 
   return {
@@ -582,6 +620,7 @@ function runCommandCapture(
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
     error: result.error ?? undefined,
+    timedOut: result.signal === "SIGTERM" && opts.timeoutMs !== undefined,
   };
 }
 

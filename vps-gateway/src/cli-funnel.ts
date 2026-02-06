@@ -13,6 +13,19 @@ export function extractFunnelUrl(statusJson: string): string | undefined {
   return scanned;
 }
 
+export function extractFunnelUrlFromText(text: string): string | undefined {
+  const https = text.match(/https:\/\/[^\s"']+/)?.[0];
+  if (https) return https;
+
+  // Common host forms in `tailscale funnel status` output.
+  const host =
+    text.match(/\b([a-zA-Z0-9.-]+\.ts\.net)\b/)?.[1] ??
+    text.match(/\b([a-zA-Z0-9.-]+\.tailscale\.net)\b/)?.[1];
+  if (host) return `https://${host}`;
+
+  return undefined;
+}
+
 function extractFromKnownFields(input: unknown): string | undefined {
   if (!input || typeof input !== "object") return undefined;
   const obj = input as Record<string, unknown>;
