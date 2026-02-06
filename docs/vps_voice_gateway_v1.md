@@ -78,6 +78,7 @@ Notes:
 ### Implementation Base (TypeScript)
 - Runtime code lives in `/Users/matt/levi/vps-gateway`.
 - Entry point: `/Users/matt/levi/vps-gateway/src/index.ts`.
+- Interactive env setup: `sandalphone install`.
 - Dev run: `node dist/cli.js dev` (after `npm install` and `npm run build` in `/Users/matt/levi/vps-gateway`).
 - Live endpoint smoke check: `node dist/cli.js smoke live --base-url https://voice.yourdomain.com`.
 - VPS env sanity check: `node dist/cli.js doctor deploy`.

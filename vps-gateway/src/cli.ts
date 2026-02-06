@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { createInterface } from "node:readline/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { applyEnvUpdates, parseEnvFile, type EnvMap } from "./cli-env-file.js";
 
 type Dict = Record<string, string | undefined>;
 
@@ -11,7 +14,14 @@ type CliContext = {
   projectRoot: string;
 };
 
-function main(argv: string[]): void {
+type PromptOptions = {
+  defaultValue?: string;
+  required?: boolean;
+  secret?: boolean;
+  validate?: (value: string) => string | undefined;
+};
+
+async function main(argv: string[]): Promise<void> {
   const context: CliContext = {
     projectRoot: resolve(dirname(fileURLToPath(import.meta.url)), ".."),
   };
@@ -28,6 +38,10 @@ function main(argv: string[]): void {
     case "dev":
     case "start": {
       runNpmScript(command, context);
+      return;
+    }
+    case "install": {
+      await handleInstall(rest, context);
       return;
     }
     case "test": {
@@ -49,6 +63,167 @@ function main(argv: string[]): void {
     default: {
       die(`unknown command: ${command}`);
     }
+  }
+}
+
+async function handleInstall(args: string[], context: CliContext): Promise<void> {
+  const { flags } = parseFlags(args);
+  const examplePath = resolve(context.projectRoot, ".env.example");
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? flags["env-file"] ?? ".env");
+
+  if (!existsSync(examplePath)) {
+    die(`missing template file: ${examplePath}`);
+  }
+
+  const templateText = readFileSync(examplePath, "utf8");
+  const currentText = existsSync(envPath) ? readFileSync(envPath, "utf8") : templateText;
+  const currentValues = parseEnvFile(currentText);
+
+  process.stdout.write(`[sandalphone] interactive install\n`);
+  process.stdout.write(`[sandalphone] target env file: ${envPath}\n`);
+  process.stdout.write(`[sandalphone] press Enter to keep shown default\n\n`);
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+  try {
+    const defaults: EnvMap = {
+      PORT: currentValues.PORT ?? "8080",
+      PUBLIC_BASE_URL: currentValues.PUBLIC_BASE_URL ?? "",
+      DESTINATION_PHONE_E164: currentValues.DESTINATION_PHONE_E164 ?? "+15555550100",
+      TWILIO_PHONE_NUMBER: currentValues.TWILIO_PHONE_NUMBER ?? "",
+      VOIPMS_DID: currentValues.VOIPMS_DID ?? "",
+      ASTERISK_SHARED_SECRET:
+        currentValues.ASTERISK_SHARED_SECRET ?? randomBytes(16).toString("hex"),
+      TWILIO_AUTH_TOKEN: currentValues.TWILIO_AUTH_TOKEN ?? "",
+      ASSEMBLYAI_API_KEY: currentValues.ASSEMBLYAI_API_KEY ?? "",
+      GOOGLE_TRANSLATE_API_KEY: currentValues.GOOGLE_TRANSLATE_API_KEY ?? "",
+      AWS_ACCESS_KEY_ID: currentValues.AWS_ACCESS_KEY_ID ?? "",
+      AWS_SECRET_ACCESS_KEY: currentValues.AWS_SECRET_ACCESS_KEY ?? "",
+      AWS_REGION: currentValues.AWS_REGION ?? "us-west-2",
+      POLLY_VOICE_EN: currentValues.POLLY_VOICE_EN ?? "Joanna",
+      POLLY_VOICE_ES: currentValues.POLLY_VOICE_ES ?? "Lupe",
+    };
+
+    const updates: EnvMap = {
+      PORT: await prompt(rl, "Gateway HTTP port", {
+        defaultValue: defaults.PORT,
+        required: true,
+        validate: (value) => {
+          const port = Number(value);
+          if (!Number.isFinite(port) || port <= 0) return "must be a positive number";
+          return undefined;
+        },
+      }),
+      PUBLIC_BASE_URL: await prompt(rl, "Public base URL (for Twilio signature checks)", {
+        defaultValue: defaults.PUBLIC_BASE_URL,
+      }),
+      DESTINATION_PHONE_E164: await prompt(rl, "Primary destination phone (E.164)", {
+        defaultValue: defaults.DESTINATION_PHONE_E164,
+        required: true,
+        validate: (value) => {
+          if (!/^\+[1-9]\d{7,14}$/.test(value)) {
+            return "must be E.164 format like +15555550100";
+          }
+          return undefined;
+        },
+      }),
+      TWILIO_PHONE_NUMBER: await prompt(rl, "Twilio DID number (optional)", {
+        defaultValue: defaults.TWILIO_PHONE_NUMBER,
+      }),
+      VOIPMS_DID: await prompt(rl, "VoIP.ms DID number (optional)", {
+        defaultValue: defaults.VOIPMS_DID,
+      }),
+      ASTERISK_SHARED_SECRET: await prompt(rl, "Asterisk shared secret", {
+        defaultValue: defaults.ASTERISK_SHARED_SECRET,
+        secret: true,
+        required: true,
+      }),
+      TWILIO_AUTH_TOKEN: await prompt(rl, "Twilio auth token", {
+        defaultValue: defaults.TWILIO_AUTH_TOKEN,
+        secret: true,
+      }),
+      ASSEMBLYAI_API_KEY: await prompt(rl, "AssemblyAI API key", {
+        defaultValue: defaults.ASSEMBLYAI_API_KEY,
+        secret: true,
+      }),
+      GOOGLE_TRANSLATE_API_KEY: await prompt(rl, "Google Translate API key", {
+        defaultValue: defaults.GOOGLE_TRANSLATE_API_KEY,
+        secret: true,
+      }),
+      AWS_ACCESS_KEY_ID: await prompt(rl, "AWS access key ID", {
+        defaultValue: defaults.AWS_ACCESS_KEY_ID,
+        secret: true,
+      }),
+      AWS_SECRET_ACCESS_KEY: await prompt(rl, "AWS secret access key", {
+        defaultValue: defaults.AWS_SECRET_ACCESS_KEY,
+        secret: true,
+      }),
+      AWS_REGION: await prompt(rl, "AWS region", {
+        defaultValue: defaults.AWS_REGION,
+        required: true,
+      }),
+      POLLY_VOICE_EN: await prompt(rl, "Polly English voice", {
+        defaultValue: defaults.POLLY_VOICE_EN,
+        required: true,
+      }),
+      POLLY_VOICE_ES: await prompt(rl, "Polly Spanish voice", {
+        defaultValue: defaults.POLLY_VOICE_ES,
+        required: true,
+      }),
+    };
+
+    const mergedText = applyEnvUpdates(currentText, updates);
+    writeFileSync(envPath, mergedText.endsWith("\n") ? mergedText : `${mergedText}\n`, "utf8");
+
+    process.stdout.write(`\n[sandalphone] wrote env file: ${envPath}\n`);
+    process.stdout.write("[sandalphone] next steps:\n");
+    process.stdout.write("  1. sandalphone doctor deploy\n");
+    process.stdout.write("  2. sandalphone service print-unit\n");
+    process.stdout.write("  3. sandalphone smoke live --base-url http://127.0.0.1:8080\n");
+  } finally {
+    rl.close();
+  }
+}
+
+async function prompt(
+  rl: ReturnType<typeof createInterface>,
+  label: string,
+  opts: PromptOptions,
+): Promise<string> {
+  while (true) {
+    const renderedDefault =
+      opts.defaultValue !== undefined
+        ? opts.secret
+          ? opts.defaultValue
+            ? " [set]"
+            : " [empty]"
+          : ` [${opts.defaultValue}]`
+        : "";
+
+    let raw: string;
+    try {
+      raw = await rl.question(`${label}${renderedDefault}: `);
+    } catch {
+      if (opts.defaultValue !== undefined) return opts.defaultValue;
+      if (opts.required) {
+        throw new Error(`missing required input for ${label}`);
+      }
+      return "";
+    }
+    const value = raw.trim() === "" ? opts.defaultValue ?? "" : raw.trim();
+
+    if (opts.required && value.length === 0) {
+      process.stdout.write("  value is required\n");
+      continue;
+    }
+
+    const error = opts.validate?.(value);
+    if (error) {
+      process.stdout.write(`  ${error}\n`);
+      continue;
+    }
+
+    return value;
   }
 }
 
@@ -220,6 +395,7 @@ function die(message: string): never {
 function printHelp(): void {
   process.stdout.write(`sandalphone: VPS gateway operator CLI\n\n`);
   process.stdout.write(`Usage:\n`);
+  process.stdout.write(`  sandalphone install [--env-path PATH]\n`);
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
   process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
@@ -240,4 +416,7 @@ function printServiceHelp(): void {
   process.stdout.write(`  sandalphone service logs [--lines N]\n`);
 }
 
-main(process.argv.slice(2));
+void main(process.argv.slice(2)).catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  die(message);
+});
