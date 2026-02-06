@@ -314,8 +314,14 @@ function setupFunnelAndPersistEnv(
   if (opts.bg ?? true) args.push("--bg");
   if (opts.yes ?? true) args.push("--yes");
   args.push(port);
+  process.stdout.write(`[sandalphone] running: tailscale ${args.join(" ")}\n`);
 
   const up = runCommandCapture("tailscale", args, { timeoutMs: 15000 });
+  process.stdout.write(`[sandalphone] tailscale exit status: ${up.status}\n`);
+  const spawnErrorMessage = up.error?.message;
+  if (spawnErrorMessage) {
+    process.stderr.write(`[sandalphone] tailscale spawn error: ${spawnErrorMessage}\n`);
+  }
   if (up.timedOut) {
     process.stderr.write(
       "[sandalphone] tailscale funnel timed out; run `sandalphone funnel up --port " +
@@ -325,48 +331,91 @@ function setupFunnelAndPersistEnv(
     return undefined;
   }
   if (up.status !== 0) {
-    process.stderr.write(up.stderr);
-    die("failed to start tailscale funnel");
+    const disabledUrl = extractFunnelEnableUrl(`${up.stdout}\n${up.stderr}`);
+    if (disabledUrl) {
+      process.stderr.write(
+        "[sandalphone] Funnel is disabled for this tailnet. Enable it first:\n",
+      );
+      process.stderr.write(`  ${disabledUrl}\n`);
+      process.stderr.write(
+        "[sandalphone] After enabling, re-run `sandalphone funnel up --port " +
+          `${port}` +
+          "` or continue install and paste PUBLIC_BASE_URL manually.\n",
+      );
+      return undefined;
+    }
+    const failureOut = `${up.stdout}\n${up.stderr}`.trim();
+    if (failureOut.length > 0) process.stderr.write(`${failureOut}\n`);
+    return undefined;
   }
-  process.stdout.write(up.stdout);
-
-  process.stdout.write("[sandalphone] reading funnel status...\n");
-  const status = runCommandCapture("tailscale", ["funnel", "status", "--json"], { timeoutMs: 7000 });
-  if (status.timedOut) {
+  const upCombined = `${up.stdout}\n${up.stderr}`.trim();
+  if (upCombined.length > 0) {
+    process.stdout.write(`${upCombined}\n`);
+  }
+  if (looksLikeTailscaleFailure(upCombined)) {
     process.stderr.write(
-      "[sandalphone] tailscale funnel status timed out; run `sandalphone funnel status` manually\n",
+      "[sandalphone] tailscale reported a local CLI/daemon error; check `tailscale status` in this same shell\n",
     );
     return undefined;
   }
-  if (status.status !== 0) {
-    process.stderr.write(status.stderr);
-    return detectFunnelUrlFromPlainStatus();
-  }
 
-  const url = extractFunnelUrl(status.stdout);
-  if (!url) {
-    const plain = detectFunnelUrlFromPlainStatus();
-    if (!plain) return undefined;
-    updateEnvFile(envPath, { PUBLIC_BASE_URL: plain }, context.projectRoot);
-    return plain;
+  // Prefer immediate URL from `tailscale funnel --bg --yes <port>` output.
+  const fromUpOutput = extractFunnelUrlFromText(upCombined) ?? "";
+  if (fromUpOutput.length > 0) {
+    const normalized = normalizePublicBaseUrl(fromUpOutput);
+    updateEnvFile(envPath, { PUBLIC_BASE_URL: normalized }, context.projectRoot);
+    return normalized;
   }
+  process.stdout.write("[sandalphone] no URL found directly in tailscale output; polling status...\n");
 
-  updateEnvFile(envPath, { PUBLIC_BASE_URL: url }, context.projectRoot);
-  return url;
+  // In --bg mode Tailscale may take a moment before status reflects funnel config.
+  const resolved = resolveFunnelUrlWithRetries();
+  if (resolved === undefined) return undefined;
+  const resolvedUrl = normalizePublicBaseUrl(resolved!);
+  updateEnvFile(envPath, { PUBLIC_BASE_URL: resolvedUrl }, context.projectRoot);
+  return resolvedUrl;
 }
 
 function detectFunnelUrlFromPlainStatus(): string | undefined {
   const plain = runCommandCapture("tailscale", ["funnel", "status"], { timeoutMs: 7000 });
   if (plain.status !== 0) return undefined;
-  if (plain.stdout) process.stdout.write(plain.stdout);
-  return extractFunnelUrlFromText(plain.stdout);
+  const combined = `${plain.stdout}\n${plain.stderr}`.trim();
+  if (combined.length > 0) process.stdout.write(`${combined}\n`);
+  if (looksLikeTailscaleFailure(combined)) return undefined;
+  return extractFunnelUrlFromText(combined);
+}
+
+function extractFunnelEnableUrl(output: string): string | undefined {
+  return output.match(/https:\/\/login\.tailscale\.com\/f\/funnel\?[^\s"'`]+/)?.[0];
+}
+
+function resolveFunnelUrlWithRetries(): string | undefined {
+  process.stdout.write("[sandalphone] reading funnel status...\n");
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    process.stdout.write(`[sandalphone] status attempt ${attempt}/20\n`);
+    const status = runCommandCapture("tailscale", ["funnel", "status", "--json"], {
+      timeoutMs: 7000,
+    });
+    if (!status.timedOut && status.status === 0) {
+      const fromJson = extractFunnelUrl(`${status.stdout}\n${status.stderr}`);
+      if (fromJson) return fromJson;
+    }
+
+    const fromPlain = detectFunnelUrlFromPlainStatus();
+    if (fromPlain) return fromPlain;
+
+    if (attempt < 20) sleepMs(1000);
+  }
+
+  return undefined;
 }
 
 function printManualFunnelUrlSteps(port: string): void {
   process.stdout.write("  manual URL discovery:\n");
-  process.stdout.write(`    1) tailscale funnel up --port ${port}\n`);
-  process.stdout.write("    2) tailscale funnel status\n");
-  process.stdout.write("    3) copy the https://... host and paste it as PUBLIC_BASE_URL\n");
+  process.stdout.write(`    1) sandalphone funnel up --port ${port}\n`);
+  process.stdout.write("    2) sandalphone funnel status\n");
+  process.stdout.write("    3) if needed, run: tailscale funnel status\n");
+  process.stdout.write("    4) copy the https://... host and paste it as PUBLIC_BASE_URL\n");
 }
 
 function updateEnvFile(envPath: string, updates: EnvMap, projectRoot: string): void {
@@ -627,6 +676,28 @@ function runCommandCapture(
 function stripScheme(url: string): string {
   return url.replace(/^https?:\/\//, "");
 }
+
+function normalizePublicBaseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "");
+}
+
+function sleepMs(ms: number): void {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    // intentional busy wait; used for short CLI retry delays
+  }
+}
+
+function looksLikeTailscaleFailure(output: string): boolean {
+  const normalized = output.toLowerCase();
+  return (
+    normalized.includes("failed to load preferences") ||
+    normalized.includes("the tailscale cli failed to start") ||
+    normalized.includes("failed to connect to local tailscale daemon") ||
+    normalized.includes("not running?")
+  );
+}
+
 
 function die(message: string): never {
   process.stderr.write(`[sandalphone] ${message}\n`);
