@@ -17,7 +17,7 @@ export function makeProviders(config: AppConfig, logger: Logger): ProviderBundle
         apiKey: config.assemblyAiApiKey,
         url: config.assemblyAiRealtimeUrl,
       })
-    : new StubAssemblyAiProvider();
+    : new StubAssemblyAiProvider(config.stubSttText ?? "");
 
   const translator = config.googleTranslateApiKey
     ? new GoogleTranslationProvider({ apiKey: config.googleTranslateApiKey })

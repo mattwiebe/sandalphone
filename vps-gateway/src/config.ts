@@ -11,6 +11,7 @@ export interface AppConfig {
   readonly pollyVoiceEn: string;
   readonly pollyVoiceEs: string;
   readonly egressMaxQueuePerSession: number;
+  readonly stubSttText?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -45,5 +46,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     pollyVoiceEn: env.POLLY_VOICE_EN ?? "Joanna",
     pollyVoiceEs: env.POLLY_VOICE_ES ?? "Lupe",
     egressMaxQueuePerSession,
+    stubSttText: env.STUB_STT_TEXT,
   };
 }
