@@ -11,6 +11,7 @@ import {
   validateAsteriskMediaPayload,
 } from "../ingress/asterisk.js";
 import { wireTwilioMediaSocket } from "../ingress/twilio-media-stream.js";
+import { hasValidAsteriskSecret } from "./auth.js";
 import type { Logger } from "./logger.js";
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
@@ -46,6 +47,7 @@ export function startHttpServer(
   port: number,
   logger: Logger,
   orchestrator: VoiceOrchestrator,
+  opts: { readonly asteriskSharedSecret?: string } = {},
 ): Server {
   const twilioWs = new WebSocketServer({ noServer: true });
 
@@ -76,6 +78,9 @@ export function startHttpServer(
       }
 
       if (method === "POST" && pathname === "/asterisk/inbound") {
+        if (!hasValidAsteriskSecret(req, opts.asteriskSharedSecret)) {
+          return writeJson(res, 403, { error: "forbidden" });
+        }
         const payload = await readJsonBody(req);
         if (!validateAsteriskInboundPayload(payload)) {
           return writeJson(res, 400, { error: "invalid_payload" });
@@ -85,6 +90,9 @@ export function startHttpServer(
       }
 
       if (method === "POST" && pathname === "/asterisk/media") {
+        if (!hasValidAsteriskSecret(req, opts.asteriskSharedSecret)) {
+          return writeJson(res, 403, { error: "forbidden" });
+        }
         const payload = await readJsonBody(req);
         if (!validateAsteriskMediaPayload(payload)) {
           return writeJson(res, 400, { error: "invalid_payload" });

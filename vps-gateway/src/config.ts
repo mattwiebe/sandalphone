@@ -2,6 +2,7 @@ export interface AppConfig {
   readonly port: number;
   readonly destination phoneE164: string;
   readonly logLevel: "debug" | "info" | "warn" | "error";
+  readonly asteriskSharedSecret?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -17,5 +18,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     port,
     destination phoneE164,
     logLevel,
+    asteriskSharedSecret: env.ASTERISK_SHARED_SECRET,
   };
 }
