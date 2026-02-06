@@ -7,7 +7,7 @@ import { makeLogger } from "../server/logger.js";
 function baseConfig(): AppConfig {
   return {
     port: 8080,
-    destination phoneE164: "+15555550100",
+    destinationPhoneE164: "+15555550100",
     logLevel: "error",
     asteriskSharedSecret: undefined,
     pipelineMinFrameIntervalMs: 400,

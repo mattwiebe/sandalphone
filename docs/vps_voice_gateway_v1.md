@@ -154,7 +154,7 @@ Notes:
 - Stream media to `wss://voice.yourdomain.com/twilio/stream`
 - Call your phone leg on inbound
 
-### destination phone Number (config)
+### Destination Number (config)
 - Store E.164 in config, e.g. `+52XXXXXXXXXX`.
 
 ---

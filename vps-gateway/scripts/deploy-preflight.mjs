@@ -9,8 +9,8 @@ for (const key of required) {
   if (!process.env[key]) failures.push(`${key} is required`);
 }
 
-const destination phone = process.env.DESTINATION_PHONE_E164 ?? "";
-if (destination phone && !/^\+[1-9]\d{7,14}$/.test(destination phone)) {
+const destinationPhone = process.env.DESTINATION_PHONE_E164 ?? "";
+if (destinationPhone && !/^\+[1-9]\d{7,14}$/.test(destinationPhone)) {
   failures.push("DESTINATION_PHONE_E164 must be E.164 format, e.g. +15555550100");
 }
 
