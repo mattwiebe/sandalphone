@@ -20,6 +20,7 @@ function main(): void {
         logger,
       })
     : undefined;
+  let orchestratorRef: VoiceOrchestrator | undefined;
 
   const orchestrator = new VoiceOrchestrator({
     logger,
@@ -29,11 +30,15 @@ function main(): void {
     tts: providers.tts,
     outboundTargetE164: config.outboundTargetE164,
     minFrameIntervalMs: config.pipelineMinFrameIntervalMs,
-    onTtsChunk: (chunk) => egressStore.enqueue(chunk),
+    onTtsChunk: (chunk) => {
+      const enqueue = egressStore.enqueue(chunk);
+      orchestratorRef?.reportEgressStats(chunk.sessionId, enqueue);
+    },
     onSessionEvent: openClawBridge
       ? (event) => openClawBridge.publishSessionEvent(event)
       : undefined,
   });
+  orchestratorRef = orchestrator;
 
   const server = startHttpServer(config.port, logger, orchestrator, {
     asteriskSharedSecret: config.asteriskSharedSecret,

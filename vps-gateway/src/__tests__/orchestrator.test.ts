@@ -158,6 +158,8 @@ test("onAudioFrame throttles frames under min interval", async () => {
   });
 
   assert.equal(stt.calls, 2);
+  const metrics = orchestrator.listMetrics()[0];
+  assert.equal((metrics?.droppedFrames ?? 0) >= 1, true);
 });
 
 test("onAudioFrame emits synthesized chunk to egress callback", async () => {
@@ -206,4 +208,6 @@ test("updateSessionControl changes mode and passthrough skips pipeline", async (
   });
 
   assert.equal(stt.calls, 0);
+  const metrics = orchestrator.listMetrics()[0];
+  assert.equal((metrics?.passthroughFrames ?? 0) >= 1, true);
 });

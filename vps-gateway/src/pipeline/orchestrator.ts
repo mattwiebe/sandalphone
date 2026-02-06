@@ -69,6 +69,14 @@ export class VoiceOrchestrator {
     return this.deps.sessionStore.getByExternal(source, externalCallId)?.id;
   }
 
+  public getSession(sessionId: string): CallSession | undefined {
+    return this.deps.sessionStore.get(sessionId);
+  }
+
+  public getMetrics(sessionId: string): SessionMetrics | undefined {
+    return this.metrics.get(sessionId);
+  }
+
   public updateSessionControl(
     sessionId: string,
     patch: SessionControlUpdate,
@@ -105,6 +113,7 @@ export class VoiceOrchestrator {
       return;
     }
     if (session.mode === "passthrough") {
+      this.incrementMetric(frame.sessionId, "passthroughFrames");
       return;
     }
 
@@ -114,6 +123,7 @@ export class VoiceOrchestrator {
       previousFrameTs !== undefined &&
       frame.timestampMs - previousFrameTs < minFrameIntervalMs
     ) {
+      this.markFrameDropped(frame.sessionId);
       return;
     }
     this.lastFrameAtMs.set(frame.sessionId, frame.timestampMs);
@@ -176,6 +186,7 @@ export class VoiceOrchestrator {
       ttsLatencyMs,
       pipelineLatencyMs,
     });
+    this.incrementMetric(frame.sessionId, "translatedChunks");
 
     this.deps.logger.debug("translated chunk", {
       sessionId: frame.sessionId,
@@ -213,14 +224,49 @@ export class VoiceOrchestrator {
     return [...this.metrics.values()];
   }
 
+  public reportEgressStats(
+    sessionId: string,
+    stats: { queueSize: number; droppedOldest: boolean },
+  ): void {
+    const current = this.metrics.get(sessionId) ?? { sessionId };
+    const egressQueuePeak = Math.max(current.egressQueuePeak ?? 0, stats.queueSize);
+    const egressDropCount = (current.egressDropCount ?? 0) + (stats.droppedOldest ? 1 : 0);
+    this.metrics.set(sessionId, {
+      ...current,
+      egressQueuePeak,
+      egressDropCount,
+    });
+  }
+
+  public markFrameDropped(sessionId: string): void {
+    this.incrementMetric(sessionId, "droppedFrames");
+  }
+
   private trackMetrics(sessionId: string, delta: SessionMetrics): void {
     const previous = this.metrics.get(sessionId) ?? { sessionId };
     this.metrics.set(sessionId, {
+      ...previous,
       sessionId,
       sttLatencyMs: delta.sttLatencyMs ?? previous.sttLatencyMs,
       translationLatencyMs: delta.translationLatencyMs ?? previous.translationLatencyMs,
       ttsLatencyMs: delta.ttsLatencyMs ?? previous.ttsLatencyMs,
       pipelineLatencyMs: delta.pipelineLatencyMs ?? previous.pipelineLatencyMs,
+    });
+  }
+
+  private incrementMetric(
+    sessionId: string,
+    field:
+      | "droppedFrames"
+      | "passthroughFrames"
+      | "translatedChunks"
+      | "egressDropCount",
+  ): void {
+    const current = this.metrics.get(sessionId) ?? { sessionId };
+    const next = (current[field] ?? 0) + 1;
+    this.metrics.set(sessionId, {
+      ...current,
+      [field]: next,
     });
   }
 

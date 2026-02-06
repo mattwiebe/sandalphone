@@ -62,10 +62,14 @@ sandalphone test
 sandalphone test smoke
 sandalphone test quick
 sandalphone smoke live --base-url https://voice.yourdomain.com
+sandalphone session list
+sandalphone session set --session-id <id> --mode passthrough
+sandalphone session debug --session-id <id>
 sandalphone urls
 sandalphone openclaw command --command "start research project on vendor pricing"
 sandalphone doctor deploy
 sandalphone doctor local
+sandalphone doctor callpath
 sandalphone service print-unit
 sandalphone service print-launchd
 sandalphone service install-launchd
@@ -129,6 +133,7 @@ If auto-detection fails, run `tailscale funnel status`, copy the `https://...` h
 
 ## Current Endpoints
 - `GET /health`
+- `GET /sessions/:sessionId/debug`
 - `POST /sessions/control` (mode/language updates)
 - `POST /openclaw/command` (relay instructions to configured OpenClaw bridge)
 - `GET /sessions`
@@ -350,6 +355,20 @@ Checks:
 - `.env` presence and required target phone format
 - `PUBLIC_BASE_URL` HTTPS validity
 - Tailscale CLI/funnel status visibility
+
+## Callpath Doctor
+Quickly inspect a live/recent call and quality metrics:
+
+```bash
+sandalphone doctor callpath
+sandalphone doctor callpath --session-id <session-id>
+```
+
+Includes:
+- mode/language state
+- latency snapshot (STT/MT/TTS/pipeline)
+- dropped frame and passthrough counters
+- egress queue peak + drop count
 
 ## Twilio URL Output
 Print exact URLs to paste in Twilio console:

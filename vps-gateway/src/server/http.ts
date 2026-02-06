@@ -81,6 +81,19 @@ export function startHttpServer(
         return writeJson(res, 200, { sessions: orchestrator.listSessions() });
       }
 
+      const debugMatch = pathname.match(/^\/sessions\/([^/]+)\/debug$/);
+      if (method === "GET" && debugMatch) {
+        const sessionId = decodeURIComponent(debugMatch[1] ?? "");
+        const session = orchestrator.getSession(sessionId);
+        if (!session) {
+          return writeJson(res, 404, { error: "session_not_found" });
+        }
+        return writeJson(res, 200, {
+          session,
+          metrics: orchestrator.getMetrics(sessionId) ?? { sessionId },
+        });
+      }
+
       if (method === "GET" && pathname === "/metrics") {
         return writeJson(res, 200, { metrics: orchestrator.listMetrics() });
       }

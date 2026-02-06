@@ -78,6 +78,10 @@ async function main(argv: string[]): Promise<void> {
       await handleOpenClaw(rest, context);
       return;
     }
+    case "session": {
+      await handleSession(rest, context);
+      return;
+    }
     case "service": {
       handleService(rest, context);
       return;
@@ -572,7 +576,7 @@ function handleSmoke(args: string[], context: CliContext): void {
 
 function handleDoctor(args: string[], context: CliContext): void {
   const mode = args[0] ?? "deploy";
-  if (mode !== "deploy" && mode !== "local") {
+  if (mode !== "deploy" && mode !== "local" && mode !== "callpath") {
     die(`unknown doctor mode: ${mode}`);
   }
 
@@ -584,6 +588,13 @@ function handleDoctor(args: string[], context: CliContext): void {
 
   if (mode === "local") {
     runNodeScript("scripts/doctor-local.mjs", context, env);
+    return;
+  }
+  if (mode === "callpath") {
+    if (flags["base-url"]) env.BASE_URL = flags["base-url"];
+    if (flags["session-id"]) env.SESSION_ID = flags["session-id"];
+    if (flags.secret) env.CONTROL_API_SECRET = flags.secret;
+    runNodeScript("scripts/doctor-callpath.mjs", context, env);
     return;
   }
 
@@ -620,13 +631,7 @@ async function handleOpenClaw(args: string[], context: CliContext): Promise<void
   }
 
   const { flags, extras } = parseFlags(args.slice(1));
-  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
-  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
-  const env = parseEnvFile(envText);
-  const baseUrl = normalizePublicBaseUrl(flags["base-url"] ?? env.PUBLIC_BASE_URL ?? "");
-  if (!baseUrl) {
-    die("PUBLIC_BASE_URL is required. Set it in .env or pass --base-url");
-  }
+  const baseUrl = resolveGatewayBaseUrl(context, flags);
 
   const command = flags.command ?? extras.join(" ").trim();
   if (!command) {
@@ -636,7 +641,7 @@ async function handleOpenClaw(args: string[], context: CliContext): Promise<void
   const headers: Record<string, string> = {
     "content-type": "application/json",
   };
-  const controlSecret = flags.secret ?? env.CONTROL_API_SECRET;
+  const controlSecret = resolveControlSecret(context, flags);
   if (controlSecret) {
     headers["x-control-secret"] = controlSecret;
   }
@@ -657,6 +662,119 @@ async function handleOpenClaw(args: string[], context: CliContext): Promise<void
     die(`openclaw command failed with ${response.status}: ${body.slice(0, 300)}`);
   }
   process.stdout.write("[sandalphone] openclaw command accepted\n");
+}
+
+async function handleSession(args: string[], context: CliContext): Promise<void> {
+  const action = args[0] ?? "help";
+  if (action === "help") {
+    printSessionHelp();
+    return;
+  }
+
+  const { flags } = parseFlags(args.slice(1));
+  const baseUrl = resolveGatewayBaseUrl(context, flags);
+  const headers: Record<string, string> = {};
+  const controlSecret = resolveControlSecret(context, flags);
+  if (controlSecret) {
+    headers["x-control-secret"] = controlSecret;
+  }
+
+  if (action === "list") {
+    const response = await fetch(`${baseUrl}/sessions`, { headers });
+    if (!response.ok) {
+      const body = await response.text();
+      die(`session list failed with ${response.status}: ${body.slice(0, 300)}`);
+    }
+    const payload = (await response.json()) as {
+      sessions?: Array<{
+        id: string;
+        source: string;
+        state: string;
+        mode: string;
+        sourceLanguage: string;
+        targetLanguage: string;
+      }>;
+    };
+    const sessions = payload.sessions ?? [];
+    if (sessions.length === 0) {
+      process.stdout.write("[sandalphone] no sessions found\n");
+      return;
+    }
+    for (const session of sessions) {
+      process.stdout.write(
+        `${session.id} source=${session.source} state=${session.state} mode=${session.mode} lang=${session.sourceLanguage}->${session.targetLanguage}\n`,
+      );
+    }
+    return;
+  }
+
+  if (action === "set") {
+    const sessionId = flags["session-id"];
+    const callId = flags["call-id"];
+    if (!sessionId && !callId) {
+      die("session set requires --session-id or --call-id");
+    }
+    if (!flags.mode && !flags["source-language"] && !flags["target-language"]) {
+      die("session set requires --mode and/or language flags");
+    }
+    const response = await fetch(`${baseUrl}/sessions/control`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sessionId,
+        callId,
+        source: flags.source,
+        mode: flags.mode,
+        sourceLanguage: flags["source-language"],
+        targetLanguage: flags["target-language"],
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      die(`session set failed with ${response.status}: ${body.slice(0, 300)}`);
+    }
+    process.stdout.write("[sandalphone] session updated\n");
+    return;
+  }
+
+  if (action === "debug") {
+    const sessionId = flags["session-id"];
+    if (!sessionId) {
+      die("session debug requires --session-id");
+    }
+    const response = await fetch(`${baseUrl}/sessions/${encodeURIComponent(sessionId)}/debug`, {
+      headers,
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      die(`session debug failed with ${response.status}: ${body.slice(0, 300)}`);
+    }
+    process.stdout.write(`${JSON.stringify(await response.json(), null, 2)}\n`);
+    return;
+  }
+
+  die(`unknown session action: ${action}`);
+}
+
+function resolveGatewayBaseUrl(context: CliContext, flags: Record<string, string>): string {
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const env = parseEnvFile(envText);
+  const baseUrl = normalizePublicBaseUrl(
+    flags["base-url"] ?? env.PUBLIC_BASE_URL ?? `http://127.0.0.1:${env.PORT ?? "8080"}`,
+  );
+  return baseUrl;
+}
+
+function resolveControlSecret(context: CliContext, flags: Record<string, string>): string {
+  if (flags.secret) return flags.secret;
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const env = parseEnvFile(envText);
+  return env.CONTROL_API_SECRET ?? "";
 }
 
 function handleService(args: string[], context: CliContext): void {
@@ -988,12 +1106,15 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
   process.stdout.write(`  sandalphone urls [--env-path .env] [--base-url https://...]\n`);
   process.stdout.write(`  sandalphone openclaw command --command \"...\" [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone session <list|set|debug>\n`);
   process.stdout.write(`  sandalphone funnel <action>\n`);
   process.stdout.write(`  sandalphone doctor deploy [--env-path .env]\n`);
   process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone doctor callpath [--base-url URL] [--session-id ID] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone service <action>\n\n`);
   process.stdout.write(`Legacy alias: levi <command>\n\n`);
   printFunnelHelp();
+  printSessionHelp();
   printServiceHelp();
 }
 
@@ -1026,6 +1147,15 @@ function printOpenClawHelp(): void {
   process.stdout.write(`OpenClaw actions:\n`);
   process.stdout.write(`  sandalphone openclaw command --command "research..." [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone openclaw command "research..." [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`\n`);
+}
+
+function printSessionHelp(): void {
+  process.stdout.write(`Session actions:\n`);
+  process.stdout.write(`  sandalphone session list [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone session set --session-id ID --mode passthrough [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone session set --call-id sip-123 --source voipms --target-language es\n`);
+  process.stdout.write(`  sandalphone session debug --session-id ID\n`);
   process.stdout.write(`\n`);
 }
 
