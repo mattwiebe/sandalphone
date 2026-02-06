@@ -106,7 +106,10 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
     const defaults: EnvMap = {
       PORT: currentValues.PORT ?? "8080",
       PUBLIC_BASE_URL: currentValues.PUBLIC_BASE_URL ?? "",
-      DESTINATION_PHONE_E164: currentValues.DESTINATION_PHONE_E164 ?? "+15555550100",
+      OUTBOUND_TARGET_E164:
+        currentValues.OUTBOUND_TARGET_E164 ??
+        currentValues.DESTINATION_PHONE_E164 ??
+        "+15555550100",
       TWILIO_PHONE_NUMBER: currentValues.TWILIO_PHONE_NUMBER ?? "",
       VOIPMS_DID: currentValues.VOIPMS_DID ?? "",
       ASTERISK_SHARED_SECRET:
@@ -148,13 +151,17 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       }
     }
 
+    process.stdout.write(
+      "[sandalphone] outbound bridge target = the phone number Sandalphone dials (usually your phone), not your Twilio/VoIP.ms managed DID\n",
+    );
+
     const updates: EnvMap = {
       PORT: selectedPort,
       PUBLIC_BASE_URL: await prompt(rl, "Public base URL (for Twilio signature checks)", {
         defaultValue: detectedPublicBaseUrl || defaults.PUBLIC_BASE_URL,
       }),
-      DESTINATION_PHONE_E164: await prompt(rl, "Primary destination phone (E.164)", {
-        defaultValue: defaults.DESTINATION_PHONE_E164,
+      OUTBOUND_TARGET_E164: await prompt(rl, "Outbound bridge target phone (E.164)", {
+        defaultValue: defaults.OUTBOUND_TARGET_E164,
         required: true,
         validate: (value) => {
           if (!/^\+[1-9]\d{7,14}$/.test(value)) {

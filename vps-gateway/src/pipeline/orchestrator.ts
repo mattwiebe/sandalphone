@@ -9,7 +9,7 @@ export type OrchestratorDeps = {
   readonly stt: StreamingSttProvider;
   readonly translator: TranslationProvider;
   readonly tts: TtsProvider;
-  readonly destinationPhoneE164: string;
+  readonly outboundTargetE164: string;
   readonly minFrameIntervalMs?: number;
   readonly onTtsChunk?: (chunk: TtsChunk) => Promise<void> | void;
 };
@@ -31,7 +31,7 @@ export class VoiceOrchestrator {
       return existing;
     }
 
-    const session = this.deps.sessionStore.createFromIncoming(event, this.deps.destinationPhoneE164);
+    const session = this.deps.sessionStore.createFromIncoming(event, this.deps.outboundTargetE164);
     this.deps.logger.info("incoming call accepted", {
       sessionId: session.id,
       source: event.source,

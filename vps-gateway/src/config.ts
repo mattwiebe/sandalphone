@@ -1,6 +1,6 @@
 export interface AppConfig {
   readonly port: number;
-  readonly destinationPhoneE164: string;
+  readonly outboundTargetE164: string;
   readonly logLevel: "debug" | "info" | "warn" | "error";
   readonly asteriskSharedSecret?: string;
   readonly pipelineMinFrameIntervalMs: number;
@@ -22,7 +22,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     throw new Error(`Invalid PORT: ${env.PORT}`);
   }
 
-  const destinationPhoneE164 = env.DESTINATION_PHONE_E164 ?? "+15555550100";
+  const outboundTargetE164 =
+    env.OUTBOUND_TARGET_E164 ?? env.DESTINATION_PHONE_E164 ?? "+15555550100";
   const logLevel = (env.LOG_LEVEL ?? "info") as AppConfig["logLevel"];
   const pipelineMinFrameIntervalMs = Number(env.PIPELINE_MIN_FRAME_INTERVAL_MS ?? "400");
   if (!Number.isFinite(pipelineMinFrameIntervalMs) || pipelineMinFrameIntervalMs < 0) {
@@ -37,7 +38,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
 
   return {
     port,
-    destinationPhoneE164,
+    outboundTargetE164,
     logLevel,
     asteriskSharedSecret: env.ASTERISK_SHARED_SECRET,
     pipelineMinFrameIntervalMs,

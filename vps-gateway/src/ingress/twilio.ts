@@ -11,12 +11,12 @@ export function parseTwilioIncoming(body: Record<string, string>): IncomingCallE
   };
 }
 
-export function buildTwimlForBridge(destinationPhoneE164: string): string {
+export function buildTwimlForBridge(outboundTargetE164: string): string {
   // v1 default: immediately dial destination phone leg.
   return [
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
     "<Response>",
-    `  <Dial>${destinationPhoneE164}</Dial>`,
+    `  <Dial>${outboundTargetE164}</Dial>`,
     "</Response>",
   ].join("\n");
 }

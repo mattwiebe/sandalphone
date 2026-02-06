@@ -65,7 +65,7 @@ async function startSmokeApp(): Promise<RunningApp> {
     stt: new SmokeStt(),
     translator: new SmokeTranslator(),
     tts: new SmokeTts(),
-    destinationPhoneE164: "+15555550100",
+    outboundTargetE164: "+15555550100",
     onTtsChunk: (chunk) => egressStore.enqueue(chunk),
   });
 

@@ -18,7 +18,7 @@ function makeOrchestrator() {
     stt: { name: "noop", transcribe: async () => null },
     translator: { name: "noop", translate: async () => null },
     tts: { name: "noop", synthesize: async () => null },
-    destinationPhoneE164: "+15555550100",
+    outboundTargetE164: "+15555550100",
   });
 }
 
