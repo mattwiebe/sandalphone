@@ -10,6 +10,7 @@ export interface AppConfig {
   readonly awsRegion: string;
   readonly pollyVoiceEn: string;
   readonly pollyVoiceEs: string;
+  readonly egressMaxQueuePerSession: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
@@ -26,6 +27,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       `Invalid PIPELINE_MIN_FRAME_INTERVAL_MS: ${env.PIPELINE_MIN_FRAME_INTERVAL_MS}`,
     );
   }
+  const egressMaxQueuePerSession = Number(env.EGRESS_MAX_QUEUE_PER_SESSION ?? "64");
+  if (!Number.isFinite(egressMaxQueuePerSession) || egressMaxQueuePerSession < 1) {
+    throw new Error(`Invalid EGRESS_MAX_QUEUE_PER_SESSION: ${env.EGRESS_MAX_QUEUE_PER_SESSION}`);
+  }
 
   return {
     port,
@@ -39,5 +44,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     awsRegion: env.AWS_REGION ?? "us-west-2",
     pollyVoiceEn: env.POLLY_VOICE_EN ?? "Joanna",
     pollyVoiceEs: env.POLLY_VOICE_ES ?? "Lupe",
+    egressMaxQueuePerSession,
   };
 }

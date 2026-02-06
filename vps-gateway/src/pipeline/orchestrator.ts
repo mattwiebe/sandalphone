@@ -1,6 +1,6 @@
 import type { Logger } from "../server/logger.js";
 import type { StreamingSttProvider, TranslationProvider, TtsProvider } from "../domain/providers.js";
-import type { AudioFrame, CallSession, IncomingCallEvent, SessionMetrics } from "../domain/types.js";
+import type { AudioFrame, CallSession, IncomingCallEvent, SessionMetrics, TtsChunk } from "../domain/types.js";
 import { SessionStore } from "./session-store.js";
 
 export type OrchestratorDeps = {
@@ -11,6 +11,7 @@ export type OrchestratorDeps = {
   readonly tts: TtsProvider;
   readonly destination phoneE164: string;
   readonly minFrameIntervalMs?: number;
+  readonly onTtsChunk?: (chunk: TtsChunk) => Promise<void> | void;
 };
 
 export class VoiceOrchestrator {
@@ -88,8 +89,12 @@ export class VoiceOrchestrator {
     }
 
     const ttsStart = Date.now();
-    await this.deps.tts.synthesize(translation);
+    const tts = await this.deps.tts.synthesize(translation);
     const ttsLatencyMs = Date.now() - ttsStart;
+
+    if (tts && this.deps.onTtsChunk) {
+      await this.deps.onTtsChunk(tts);
+    }
 
     const pipelineLatencyMs = sttLatencyMs + translationLatencyMs + ttsLatencyMs;
     this.trackMetrics(frame.sessionId, {

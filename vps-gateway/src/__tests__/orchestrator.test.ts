@@ -8,10 +8,10 @@ import type { AudioFrame, IncomingCallEvent } from "../domain/types.js";
 class StubStt {
   public readonly name = "stub-stt";
   public calls = 0;
-  public async transcribe() {
+  public async transcribe(input: { sessionId: string }) {
     this.calls += 1;
     return {
-      sessionId: "ignored",
+      sessionId: input.sessionId,
       text: "hola",
       isFinal: true,
       language: "es" as const,
@@ -22,9 +22,9 @@ class StubStt {
 
 class StubTranslator {
   public readonly name = "stub-translator";
-  public async translate() {
+  public async translate(input: { sessionId: string }) {
     return {
-      sessionId: "ignored",
+      sessionId: input.sessionId,
       text: "hello",
       sourceLanguage: "es" as const,
       targetLanguage: "en" as const,
@@ -35,18 +35,18 @@ class StubTranslator {
 
 class StubTts {
   public readonly name = "stub-tts";
-  public async synthesize() {
+  public async synthesize(input: { sessionId: string }) {
     return {
-      sessionId: "ignored",
+      sessionId: input.sessionId,
       encoding: "pcm_s16le" as const,
       sampleRateHz: 16000,
-      payload: Buffer.alloc(0),
+      payload: Buffer.from([0x01]),
       timestampMs: Date.now(),
     };
   }
 }
 
-function makeOrchestrator(minFrameIntervalMs = 0) {
+function makeOrchestrator(minFrameIntervalMs = 0, onTtsChunk?: (sessionId: string) => void) {
   const stt = new StubStt();
   return {
     stt,
@@ -58,6 +58,7 @@ function makeOrchestrator(minFrameIntervalMs = 0) {
       tts: new StubTts(),
       destination phoneE164: "+15555550100",
       minFrameIntervalMs,
+      onTtsChunk: (chunk) => onTtsChunk?.(chunk.sessionId),
     }),
   };
 }
@@ -157,4 +158,27 @@ test("onAudioFrame throttles frames under min interval", async () => {
   });
 
   assert.equal(stt.calls, 2);
+});
+
+test("onAudioFrame emits synthesized chunk to egress callback", async () => {
+  const seen: string[] = [];
+  const { orchestrator } = makeOrchestrator(0, (sessionId) => seen.push(sessionId));
+  const call: IncomingCallEvent = {
+    source: "twilio",
+    externalCallId: "CA778",
+    from: "+15550000008",
+    to: "+18005550199",
+    receivedAtMs: Date.now(),
+  };
+  const session = orchestrator.onIncomingCall(call);
+  await orchestrator.onAudioFrame({
+    sessionId: session.id,
+    source: "twilio",
+    sampleRateHz: 8000,
+    encoding: "mulaw",
+    timestampMs: Date.now(),
+    payload: Buffer.from([0x03]),
+  });
+
+  assert.deepEqual(seen, [session.id]);
 });

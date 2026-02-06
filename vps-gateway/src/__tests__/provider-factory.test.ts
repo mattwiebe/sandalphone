@@ -17,6 +17,7 @@ function baseConfig(): AppConfig {
     awsRegion: "us-west-2",
     pollyVoiceEn: "Joanna",
     pollyVoiceEs: "Lupe",
+    egressMaxQueuePerSession: 64,
   };
 }
 

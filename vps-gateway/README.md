@@ -46,6 +46,7 @@ curl -sS http://localhost:8080/sessions
 - `POST /twilio/voice` (form-encoded webhook)
 - `POST /asterisk/inbound` (JSON bridge payload)
 - `POST /asterisk/media` (JSON audio frame payload)
+- `GET /asterisk/egress/next` (poll next translated audio chunk)
 - `WS /twilio/stream` (Twilio media stream)
 
 ## Deploy (VPS)
@@ -111,6 +112,25 @@ Response:
 }
 ```
 
+### Asterisk Egress Contract
+`GET /asterisk/egress/next?callId=sip-123&source=voipms`
+
+- Requires `x-asterisk-secret` when `ASTERISK_SHARED_SECRET` is configured.
+- Returns `204` when no translated audio is queued yet.
+
+Response (`200`):
+
+```json
+{
+  "sessionId": "uuid",
+  "encoding": "pcm_s16le",
+  "sampleRateHz": 16000,
+  "timestampMs": 1736337000100,
+  "payloadBase64": "AQI=",
+  "remainingQueue": 0
+}
+```
+
 ### Twilio Voice Contract
 `POST /twilio/voice` expects Twilio form fields including `CallSid`, `From`, and `To`.
 It returns TwiML that immediately dials the configured destination phone E.164 target.
@@ -121,6 +141,7 @@ It returns TwiML that immediately dials the configured destination phone E.164 t
 - `LOG_LEVEL` (default `info`)
 - `ASTERISK_SHARED_SECRET` (recommended on public VPS; required as `x-asterisk-secret` header for `/asterisk/inbound` and `/asterisk/media` when set)
 - `PIPELINE_MIN_FRAME_INTERVAL_MS` (default `400`; throttles STT calls per session to control API churn)
+- `EGRESS_MAX_QUEUE_PER_SESSION` (default `64`; bounds queued translated chunks per call)
 - `ASSEMBLYAI_API_KEY` (enables realtime AssemblyAI STT)
 - `ASSEMBLYAI_REALTIME_URL` (optional override for realtime WS URL)
 - `GOOGLE_TRANSLATE_API_KEY` (enables Google Translate v2 REST provider)
