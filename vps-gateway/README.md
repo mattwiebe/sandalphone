@@ -1,4 +1,4 @@
-# Levi VPS Gateway (TypeScript)
+# Sandalphone VPS Gateway (TypeScript)
 
 TypeScript-first runtime for the VPS architecture:
 - Inbound call ingress (VoIP.ms via Asterisk bridge, Twilio webhook/stream)
@@ -26,22 +26,22 @@ Runnable gateway with:
 Primary operator surface:
 
 ```bash
-node dist/cli.js help
+sandalphone help
 ```
 
 Core commands:
 
 ```bash
-node dist/cli.js build
-node dist/cli.js check
-node dist/cli.js test
-node dist/cli.js test smoke
-node dist/cli.js test quick
-node dist/cli.js smoke live --base-url https://voice.yourdomain.com
-node dist/cli.js doctor deploy
-node dist/cli.js service print-unit
-node dist/cli.js service status
-node dist/cli.js service logs --lines 200
+sandalphone build
+sandalphone check
+sandalphone test
+sandalphone test smoke
+sandalphone test quick
+sandalphone smoke live --base-url https://voice.yourdomain.com
+sandalphone doctor deploy
+sandalphone service print-unit
+sandalphone service status
+sandalphone service logs --lines 200
 ```
 
 ## Smoke Test
@@ -65,13 +65,13 @@ curl -sS http://localhost:8080/sessions
 Run against a running gateway (local or VPS):
 
 ```bash
-node dist/cli.js smoke live --base-url http://127.0.0.1:8080
+sandalphone smoke live --base-url http://127.0.0.1:8080
 ```
 
 When Asterisk secret is enabled:
 
 ```bash
-node dist/cli.js smoke live \
+sandalphone smoke live \
   --base-url https://voice.yourdomain.com \
   --secret your-secret
 ```
@@ -79,7 +79,7 @@ node dist/cli.js smoke live \
 Fail if egress has no chunk (`204`):
 
 ```bash
-node dist/cli.js smoke live --strict-egress
+sandalphone smoke live --strict-egress
 ```
 
 ## Current Endpoints
@@ -99,22 +99,22 @@ node dist/cli.js smoke live --strict-egress
 3. Create env file:
    - `cp .env.example .env`
    - Set `DESTINATION_PHONE_E164` and cloud credentials.
-   - Run `node dist/cli.js doctor deploy`
+   - Run `sandalphone doctor deploy`
 4. Install and enable systemd service:
-   - `node dist/cli.js service print-unit`
-   - `sudo node dist/cli.js service install-unit`
-   - `sudo node dist/cli.js service reload`
-   - `sudo node dist/cli.js service enable`
-   - `sudo node dist/cli.js service restart`
+   - `sandalphone service print-unit`
+   - `sudo sandalphone service install-unit`
+   - `sudo sandalphone service reload`
+   - `sudo sandalphone service enable`
+   - `sudo sandalphone service restart`
 5. Verify:
-   - `node dist/cli.js smoke live --base-url http://127.0.0.1:8080`
+   - `sandalphone smoke live --base-url http://127.0.0.1:8080`
 6. Point providers to VPS:
    - Twilio voice webhook -> `POST /twilio/voice`
    - Twilio media stream websocket -> `WS /twilio/stream`
    - Asterisk bridge -> `POST /asterisk/inbound` and `POST /asterisk/media`
 
 ### Deployment Templates
-- `deploy/systemd/levi-vps-gateway.service` for non-container systemd deployments
+- `deploy/systemd/sandalphone-vps-gateway.service` for non-container systemd deployments
 - `deploy/nginx/voice-gateway.conf` reverse-proxy baseline (includes WebSocket upgrade headers)
 
 ## Runtime Notes
