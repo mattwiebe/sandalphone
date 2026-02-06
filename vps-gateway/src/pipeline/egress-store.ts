@@ -31,4 +31,8 @@ export class EgressStore {
   public size(sessionId: string): number {
     return this.queues.get(sessionId)?.length ?? 0;
   }
+
+  public clear(sessionId: string): void {
+    this.queues.delete(sessionId);
+  }
 }

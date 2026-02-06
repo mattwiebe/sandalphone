@@ -20,6 +20,8 @@ Runnable gateway with:
 2. Typecheck: `npm run check`
 3. Build: `npm run build`
 4. Test: `npm test`
+5. Smoke tests only: `npm run test:smoke`
+6. Quick gate (typecheck + smoke): `npm run test:quick`
 5. Start dev server: `npm run dev`
 
 ## Smoke Test
@@ -46,6 +48,7 @@ curl -sS http://localhost:8080/sessions
 - `POST /twilio/voice` (form-encoded webhook)
 - `POST /asterisk/inbound` (JSON bridge payload)
 - `POST /asterisk/media` (JSON audio frame payload)
+- `POST /asterisk/end` (mark session ended and clear egress buffer)
 - `GET /asterisk/egress/next` (poll next translated audio chunk)
 - `WS /twilio/stream` (Twilio media stream)
 
@@ -129,6 +132,24 @@ Response (`200`):
   "timestampMs": 1736337000100,
   "payloadBase64": "AQI=",
   "remainingQueue": 0
+}
+```
+
+### Asterisk End Contract
+`POST /asterisk/end`
+
+```json
+{
+  "callId": "sip-123",
+  "source": "voipms"
+}
+```
+
+Alternative payload:
+
+```json
+{
+  "sessionId": "uuid"
 }
 ```
 

@@ -15,6 +15,12 @@ export type AsteriskMediaPayload = {
   timestampMs?: number;
 };
 
+export type AsteriskEndPayload = {
+  callId?: string;
+  sessionId?: string;
+  source?: "voipms" | "twilio";
+};
+
 export function validateAsteriskInboundPayload(payload: unknown): payload is AsteriskInboundPayload {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
@@ -31,6 +37,16 @@ export function validateAsteriskMediaPayload(payload: unknown): payload is Aster
     (encoding === "pcm_s16le" || encoding === "mulaw") &&
     typeof p.payloadBase64 === "string"
   );
+}
+
+export function validateAsteriskEndPayload(payload: unknown): payload is AsteriskEndPayload {
+  if (!payload || typeof payload !== "object") return false;
+  const p = payload as Record<string, unknown>;
+  const hasCallId = typeof p.callId === "string";
+  const hasSessionId = typeof p.sessionId === "string";
+  const source = p.source;
+  const sourceOk = source === undefined || source === "voipms" || source === "twilio";
+  return sourceOk && (hasCallId || hasSessionId);
 }
 
 export function parseAsteriskIncoming(payload: AsteriskInboundPayload): IncomingCallEvent {
@@ -69,4 +85,13 @@ export function mapAsteriskMediaToFrame(
     timestampMs: payload.timestampMs ?? Date.now(),
     payload: Buffer.from(payload.payloadBase64, "base64"),
   };
+}
+
+export function resolveAsteriskEndSessionId(
+  orchestrator: VoiceOrchestrator,
+  payload: AsteriskEndPayload,
+): string | null {
+  if (payload.sessionId) return payload.sessionId;
+  if (!payload.callId) return null;
+  return orchestrator.resolveSessionIdByExternal(payload.source ?? "voipms", payload.callId) ?? null;
 }

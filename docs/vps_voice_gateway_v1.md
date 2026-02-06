@@ -85,6 +85,7 @@ Notes:
   - `POST /twilio/voice`
   - `POST /asterisk/inbound`
   - `POST /asterisk/media`
+  - `POST /asterisk/end`
   - `GET /asterisk/egress/next`
   - `WS /twilio/stream`
 

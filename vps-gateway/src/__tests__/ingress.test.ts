@@ -1,7 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseTwilioIncoming } from "../ingress/twilio.js";
-import { validateAsteriskInboundPayload, validateAsteriskMediaPayload } from "../ingress/asterisk.js";
+import {
+  resolveAsteriskEndSessionId,
+  validateAsteriskEndPayload,
+  validateAsteriskInboundPayload,
+  validateAsteriskMediaPayload,
+} from "../ingress/asterisk.js";
+import { VoiceOrchestrator } from "../pipeline/orchestrator.js";
+import { SessionStore } from "../pipeline/session-store.js";
+import { makeLogger } from "../server/logger.js";
+
+function makeOrchestrator() {
+  return new VoiceOrchestrator({
+    logger: makeLogger("error"),
+    sessionStore: new SessionStore(),
+    stt: { name: "noop", transcribe: async () => null },
+    translator: { name: "noop", translate: async () => null },
+    tts: { name: "noop", synthesize: async () => null },
+    destination phoneE164: "+15555550100",
+  });
+}
 
 test("parseTwilioIncoming maps required fields", () => {
   const evt = parseTwilioIncoming({
@@ -42,4 +61,24 @@ test("validateAsteriskMediaPayload accepts valid payload", () => {
     payloadBase64: Buffer.from([0x01, 0x02]).toString("base64"),
   });
   assert.equal(ok, true);
+});
+
+test("validateAsteriskEndPayload accepts callId or sessionId", () => {
+  assert.equal(validateAsteriskEndPayload({ callId: "sip-1" }), true);
+  assert.equal(validateAsteriskEndPayload({ sessionId: "session-1" }), true);
+  assert.equal(validateAsteriskEndPayload({ source: "voipms" }), false);
+});
+
+test("resolveAsteriskEndSessionId resolves by callId mapping", () => {
+  const orchestrator = makeOrchestrator();
+  const session = orchestrator.onIncomingCall({
+    source: "voipms",
+    externalCallId: "sip-2",
+    from: "+15550000001",
+    to: "+18005550199",
+    receivedAtMs: Date.now(),
+  });
+
+  const resolved = resolveAsteriskEndSessionId(orchestrator, { callId: "sip-2" });
+  assert.equal(resolved, session.id);
 });
