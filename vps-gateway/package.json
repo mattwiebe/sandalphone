@@ -1,10 +1,11 @@
 {
-  "name": "levi-vps-gateway",
+  "name": "sandalphone-vps-gateway",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "TypeScript VPS voice gateway for Levi",
+  "description": "TypeScript VPS voice gateway for Sandalphone",
   "bin": {
+    "sandalphone": "dist/cli.js",
     "levi": "dist/cli.js"
   },
   "engines": {

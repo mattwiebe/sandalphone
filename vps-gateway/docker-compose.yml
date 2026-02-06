@@ -1,7 +1,7 @@
 services:
   gateway:
     build: .
-    container_name: levi-vps-gateway
+    container_name: sandalphone-vps-gateway
     restart: unless-stopped
     ports:
       - "8080:8080"

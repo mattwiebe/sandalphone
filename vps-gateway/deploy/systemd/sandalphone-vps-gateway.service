@@ -1,24 +1,24 @@
 [Unit]
-Description=Levi VPS Gateway
+Description=Sandalphone VPS Gateway
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/levi/vps-gateway
-EnvironmentFile=/opt/levi/vps-gateway/.env
+WorkingDirectory=/opt/sandalphone/vps-gateway
+EnvironmentFile=/opt/sandalphone/vps-gateway/.env
 ExecStart=/usr/bin/node dist/index.js
 Restart=always
 RestartSec=2
-User=levi
-Group=levi
+User=sandalphone
+Group=sandalphone
 
 # Basic hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/levi/vps-gateway
+ReadWritePaths=/opt/sandalphone/vps-gateway
 
 [Install]
 WantedBy=multi-user.target

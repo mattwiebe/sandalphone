@@ -1,7 +1,7 @@
 # VPS Voice Gateway v1 (Twilio + VoIP.ms + Cloud APIs)
 
 Date: 2026-01-31
-Owner: Levi
+Owner: Sandalphone
 Scope: Always-on VPS voice gateway with SIP (VoIP.ms) + Twilio media streams, streaming STT/MT/TTS via cloud APIs, EN↔ES. Private translation mix injected into the outbound destination phone call leg by default; relay to vendor optional (v1.2+). Inbound calls auto-ring the destination phone number.
 
 ## Goals

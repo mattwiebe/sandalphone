@@ -106,7 +106,7 @@ function handleService(args: string[], context: CliContext): void {
   }
 
   if (action === "print-unit") {
-    const unitPath = resolve(context.projectRoot, "deploy/systemd/levi-vps-gateway.service");
+    const unitPath = resolve(context.projectRoot, "deploy/systemd/sandalphone-vps-gateway.service");
     process.stdout.write(readFileSync(unitPath, "utf8"));
     return;
   }
@@ -114,12 +114,12 @@ function handleService(args: string[], context: CliContext): void {
   if (action === "install-unit") {
     const { flags } = parseFlags(args.slice(1));
     const output =
-      flags.output ?? "/etc/systemd/system/levi-vps-gateway.service";
-    const source = resolve(context.projectRoot, "deploy/systemd/levi-vps-gateway.service");
+      flags.output ?? "/etc/systemd/system/sandalphone-vps-gateway.service";
+    const source = resolve(context.projectRoot, "deploy/systemd/sandalphone-vps-gateway.service");
 
     mkdirSync(dirname(output), { recursive: true });
     copyFileSync(source, output);
-    process.stdout.write(`[levi] installed unit -> ${output}\n`);
+    process.stdout.write(`[sandalphone] installed unit -> ${output}\n`);
     return;
   }
 
@@ -129,24 +129,24 @@ function handleService(args: string[], context: CliContext): void {
   }
 
   if (action === "enable") {
-    runCommand("systemctl", ["enable", "--now", "levi-vps-gateway.service"]);
+    runCommand("systemctl", ["enable", "--now", "sandalphone-vps-gateway.service"]);
     return;
   }
 
   if (action === "restart") {
-    runCommand("systemctl", ["restart", "levi-vps-gateway.service"]);
+    runCommand("systemctl", ["restart", "sandalphone-vps-gateway.service"]);
     return;
   }
 
   if (action === "status") {
-    runCommand("systemctl", ["status", "--no-pager", "levi-vps-gateway.service"]);
+    runCommand("systemctl", ["status", "--no-pager", "sandalphone-vps-gateway.service"]);
     return;
   }
 
   if (action === "logs") {
     const { flags } = parseFlags(args.slice(1));
     const lines = flags.lines ?? "200";
-    runCommand("journalctl", ["-u", "levi-vps-gateway.service", "-n", lines, "--no-pager"]);
+    runCommand("journalctl", ["-u", "sandalphone-vps-gateway.service", "-n", lines, "--no-pager"]);
     return;
   }
 
@@ -212,31 +212,32 @@ function runCommand(
 }
 
 function die(message: string): never {
-  process.stderr.write(`[levi] ${message}\n`);
-  process.stderr.write("[levi] run `levi help` for usage\n");
+  process.stderr.write(`[sandalphone] ${message}\n`);
+  process.stderr.write("[sandalphone] run `sandalphone help` for usage\n");
   process.exit(1);
 }
 
 function printHelp(): void {
-  process.stdout.write(`levi: VPS gateway operator CLI\n\n`);
+  process.stdout.write(`sandalphone: VPS gateway operator CLI\n\n`);
   process.stdout.write(`Usage:\n`);
-  process.stdout.write(`  levi build|check|dev|start\n`);
-  process.stdout.write(`  levi test [all|smoke|quick]\n`);
-  process.stdout.write(`  levi smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
-  process.stdout.write(`  levi doctor deploy\n`);
-  process.stdout.write(`  levi service <action>\n\n`);
+  process.stdout.write(`  sandalphone build|check|dev|start\n`);
+  process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
+  process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
+  process.stdout.write(`  sandalphone doctor deploy\n`);
+  process.stdout.write(`  sandalphone service <action>\n\n`);
+  process.stdout.write(`Legacy alias: levi <command>\n\n`);
   printServiceHelp();
 }
 
 function printServiceHelp(): void {
   process.stdout.write(`Service actions:\n`);
-  process.stdout.write(`  levi service print-unit\n`);
-  process.stdout.write(`  levi service install-unit [--output PATH]\n`);
-  process.stdout.write(`  levi service reload\n`);
-  process.stdout.write(`  levi service enable\n`);
-  process.stdout.write(`  levi service restart\n`);
-  process.stdout.write(`  levi service status\n`);
-  process.stdout.write(`  levi service logs [--lines N]\n`);
+  process.stdout.write(`  sandalphone service print-unit\n`);
+  process.stdout.write(`  sandalphone service install-unit [--output PATH]\n`);
+  process.stdout.write(`  sandalphone service reload\n`);
+  process.stdout.write(`  sandalphone service enable\n`);
+  process.stdout.write(`  sandalphone service restart\n`);
+  process.stdout.write(`  sandalphone service status\n`);
+  process.stdout.write(`  sandalphone service logs [--lines N]\n`);
 }
 
 main(process.argv.slice(2));

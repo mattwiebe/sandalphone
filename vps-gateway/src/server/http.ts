@@ -70,7 +70,7 @@ export function startHttpServer(
       const pathname = url.pathname;
 
       if (method === "GET" && pathname === "/health") {
-        return writeJson(res, 200, { ok: true, service: "levi-vps-gateway" });
+        return writeJson(res, 200, { ok: true, service: "sandalphone-vps-gateway" });
       }
 
       if (method === "GET" && pathname === "/sessions") {
