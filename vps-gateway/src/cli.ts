@@ -435,6 +435,15 @@ function setupFunnelAndPersistEnv(
     return undefined;
   }
   if (up.status !== 0) {
+    const combinedError = `${up.stdout}\n${up.stderr}`;
+    if (/serve config denied|Access denied/i.test(combinedError)) {
+      process.stderr.write(
+        "[sandalphone] tailscale denied funnel config. On Linux, run one of:\n",
+      );
+      process.stderr.write("  1) sudo tailscale set --operator=$USER\n");
+      process.stderr.write(`  2) sudo tailscale funnel --bg --yes ${port}\n`);
+      return undefined;
+    }
     const disabledUrl = extractFunnelEnableUrl(`${up.stdout}\n${up.stderr}`);
     if (disabledUrl) {
       process.stderr.write(
