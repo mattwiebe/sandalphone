@@ -11,16 +11,9 @@ function baseConfig(): AppConfig {
     logLevel: "error",
     asteriskSharedSecret: undefined,
     pipelineMinFrameIntervalMs: 400,
-    assemblyAiApiKey: undefined,
-    assemblyAiRealtimeUrl: undefined,
-    googleTranslateApiKey: undefined,
-    ttsProvider: "polly",
-    googleTtsApiKey: undefined,
+    googleCloudApiKey: undefined,
     googleTtsVoiceEn: "en-US-Standard-C",
     googleTtsVoiceEs: "es-US-Standard-A",
-    awsRegion: "us-west-2",
-    pollyVoiceEn: "Joanna",
-    pollyVoiceEs: "Lupe",
     egressMaxQueuePerSession: 64,
     stubSttText: undefined,
     openClawBridgeTimeoutMs: 1200,
@@ -29,22 +22,21 @@ function baseConfig(): AppConfig {
 
 test("makeProviders falls back to stubs when keys are missing", () => {
   const providers = makeProviders(baseConfig(), makeLogger("error"));
-  assert.equal(providers.stt.name, "assemblyai-stub");
+  assert.equal(providers.stt.name, "google-stt-stub");
   assert.equal(providers.translator.name, "google-translate-stub");
-  assert.equal(providers.tts.name, "aws-polly-standard");
+  assert.equal(providers.tts.name, "google-tts-stub");
 });
 
 test("makeProviders enables cloud providers when keys are present", () => {
   const providers = makeProviders(
     {
       ...baseConfig(),
-      assemblyAiApiKey: "assembly-key",
-      googleTranslateApiKey: "google-key",
+      googleCloudApiKey: "google-key",
     },
     makeLogger("error"),
   );
 
-  assert.equal(providers.stt.name, "assemblyai-realtime");
+  assert.equal(providers.stt.name, "google-stt");
   assert.equal(providers.translator.name, "google-translate-v2");
-  assert.equal(providers.tts.name, "aws-polly-standard");
+  assert.equal(providers.tts.name, "google-tts");
 });

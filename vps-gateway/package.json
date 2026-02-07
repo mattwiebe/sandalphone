@@ -27,7 +27,6 @@
     "docker:down": "docker compose down"
   },
   "dependencies": {
-    "@aws-sdk/client-polly": "^3.799.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

@@ -8,13 +8,13 @@ import type { AudioFrame, IncomingCallEvent } from "../domain/types.js";
 class StubStt {
   public readonly name = "stub-stt";
   public calls = 0;
-  public async transcribe(input: { sessionId: string }) {
+  public async transcribe(_frame: AudioFrame, sourceLanguage: "en" | "es") {
     this.calls += 1;
     return {
-      sessionId: input.sessionId,
+      sessionId: _frame.sessionId,
       text: "hola",
       isFinal: true,
-      language: "es" as const,
+      language: sourceLanguage,
       timestampMs: Date.now(),
     };
   }

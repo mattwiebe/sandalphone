@@ -1,8 +1,14 @@
-import type { AudioFrame, TranscriptionChunk, TranslationChunk, TtsChunk } from "./types.js";
+import type {
+  AudioFrame,
+  LanguageCode,
+  TranscriptionChunk,
+  TranslationChunk,
+  TtsChunk,
+} from "./types.js";
 
 export interface StreamingSttProvider {
   readonly name: string;
-  transcribe(frame: AudioFrame): Promise<TranscriptionChunk | null>;
+  transcribe(frame: AudioFrame, sourceLanguage: LanguageCode): Promise<TranscriptionChunk | null>;
 }
 
 export interface TranslationProvider {
