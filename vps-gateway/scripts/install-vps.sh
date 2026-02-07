@@ -99,6 +99,18 @@ ensure_tailscale() {
     TAILSCALE_READY="1"
     return 0
   fi
+  local json
+  json="$(tailscale status --json 2>/dev/null || true)"
+  if [[ -n "${json}" ]] && echo "${json}" | grep -q '"Self"' && echo "${json}" | grep -q '"BackendState":"Running"'; then
+    TAILSCALE_READY="1"
+    return 0
+  fi
+  local funnel_status
+  funnel_status="$(tailscale funnel status 2>/dev/null || true)"
+  if [[ -n "${funnel_status}" ]] && echo "${funnel_status}" | grep -q "\.ts\.net"; then
+    TAILSCALE_READY="1"
+    return 0
+  fi
   if [[ -z "${TAILSCALE_AUTHKEY}" ]]; then
     if [[ -t 0 ]] || [[ -t 1 && -e /dev/tty ]]; then
       log "TAILSCALE_AUTHKEY not set"
