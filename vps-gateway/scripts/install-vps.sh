@@ -75,6 +75,19 @@ ensure_dirs() {
   chown -R "${APP_USER}:${APP_USER}" "$(dirname "${APP_DIR}")"
 }
 
+normalize_app_dir() {
+  if [[ -f "${APP_DIR}/package.json" ]]; then
+    return 0
+  fi
+  if [[ -f "${APP_DIR}/vps-gateway/package.json" ]]; then
+    APP_DIR="${APP_DIR}/vps-gateway"
+    log "detected nested app dir ${APP_DIR}"
+    return 0
+  fi
+  log "clone failed or repo incomplete at ${APP_DIR}"
+  exit 1
+}
+
 ensure_node() {
   if command -v node >/dev/null 2>&1; then
     local version
@@ -175,10 +188,7 @@ clone_repo() {
     log "cloning repo"
     sudo -u "${APP_USER}" -H bash -lc "mkdir -p ${APP_DIR} && git clone ${REPO_URL} ${APP_DIR} && cd ${APP_DIR} && git checkout ${REPO_BRANCH}"
   fi
-  if [[ ! -f "${APP_DIR}/package.json" ]]; then
-    log "clone failed or repo incomplete at ${APP_DIR}"
-    exit 1
-  fi
+  normalize_app_dir
 }
 
 build_app() {
