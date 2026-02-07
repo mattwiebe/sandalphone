@@ -34,16 +34,10 @@ curl -fsSL https://raw.githubusercontent.com/mattwiebe/sandalphone/main/vps-gate
 ```
 
 Required env (pass as inline env vars to the command above):
-- `OUTBOUND_TARGET_E164` (the phone Sandalphone should dial)
 - `TAILSCALE_AUTHKEY` (Tailscale auth key with reuse enabled)
 
-Recommended env:
-- `TWILIO_AUTH_TOKEN`
-- `ASSEMBLYAI_API_KEY`
-- `GOOGLE_TRANSLATE_API_KEY`
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `OPENCLAW_BRIDGE_URL` (if you want OpenClaw integration)
+The installer now shells into `node dist/cli.js install` and prompts you for
+`OUTBOUND_TARGET_E164` and all other settings interactively.
 
 If you do not have API keys yet, the installer prints a short guide with links to get them.
 
