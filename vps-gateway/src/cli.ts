@@ -227,10 +227,16 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         secret: true,
         required: true,
       }),
-      TWILIO_AUTH_TOKEN: await prompt(rl, "Twilio auth token (optional)", {
-        defaultValue: defaults.TWILIO_AUTH_TOKEN,
-        secret: true,
-      }),
+      TWILIO_AUTH_TOKEN: await prompt(
+        rl,
+        "Twilio auth token" +
+          ((defaults.TWILIO_PHONE_NUMBER ?? "").trim().length > 0 ? " (required)" : " (optional)"),
+        {
+          defaultValue: defaults.TWILIO_AUTH_TOKEN,
+          secret: true,
+          required: (defaults.TWILIO_PHONE_NUMBER ?? "").trim().length > 0,
+        },
+      ),
       ASSEMBLYAI_API_KEY: await promptWithHelp(
         rl,
         "AssemblyAI API key",
