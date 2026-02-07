@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createInterface } from "node:readline/promises";
