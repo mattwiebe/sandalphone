@@ -4,8 +4,8 @@ const optionalCloud = ["GOOGLE_CLOUD_API_KEY"];
 const warnings = [];
 const failures = [];
 
-const fs = require("node:fs");
-const path = require("node:path");
+import fs from "node:fs";
+import path from "node:path";
 
 const envPath = process.env.ENV_PATH
   ? path.resolve(process.env.ENV_PATH)
