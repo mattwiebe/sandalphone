@@ -155,6 +155,10 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       TWILIO_AUTH_TOKEN: currentValues.TWILIO_AUTH_TOKEN ?? "",
       ASSEMBLYAI_API_KEY: currentValues.ASSEMBLYAI_API_KEY ?? "",
       GOOGLE_TRANSLATE_API_KEY: currentValues.GOOGLE_TRANSLATE_API_KEY ?? "",
+      TTS_PROVIDER: currentValues.TTS_PROVIDER ?? "polly",
+      GOOGLE_TTS_API_KEY: currentValues.GOOGLE_TTS_API_KEY ?? "",
+      GOOGLE_TTS_VOICE_EN: currentValues.GOOGLE_TTS_VOICE_EN ?? "en-US-Standard-C",
+      GOOGLE_TTS_VOICE_ES: currentValues.GOOGLE_TTS_VOICE_ES ?? "es-US-Standard-A",
       AWS_ACCESS_KEY_ID: currentValues.AWS_ACCESS_KEY_ID ?? "",
       AWS_SECRET_ACCESS_KEY: currentValues.AWS_SECRET_ACCESS_KEY ?? "",
       AWS_REGION: currentValues.AWS_REGION ?? "us-west-2",
@@ -165,7 +169,31 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       OPENCLAW_BRIDGE_TIMEOUT_MS: currentValues.OPENCLAW_BRIDGE_TIMEOUT_MS ?? "1200",
     };
 
-    const selectedPort = await prompt(rl, "Gateway HTTP port", {
+    const updates: EnvMap = {};
+    const persist = (key: string, value: string): string => {
+      updates[key] = value;
+      updateEnvFile(envPath, { [key]: value }, context.projectRoot);
+      return value;
+    };
+    const promptAndPersist = async (
+      key: string,
+      label: string,
+      opts: PromptOptions,
+    ): Promise<string> => {
+      const value = await prompt(rl, label, opts);
+      return persist(key, value);
+    };
+    const promptWithHelpAndPersist = async (
+      key: string,
+      label: string,
+      defaultValue: string | undefined,
+      helpLines: string[],
+    ): Promise<string> => {
+      const value = await promptWithHelp(rl, label, defaultValue, helpLines);
+      return persist(key, value);
+    };
+
+    const selectedPort = await promptAndPersist("PORT", "Gateway HTTP port", {
       defaultValue: defaults.PORT,
       required: true,
       validate: (value) => {
@@ -196,112 +224,147 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       "[sandalphone] outbound bridge target = the phone number Sandalphone dials (usually your phone), not your Twilio/VoIP.ms managed DID\n",
     );
 
-    const updates: EnvMap = {
-      PORT: selectedPort,
-      OUTBOUND_TARGET_E164: await prompt(rl, "Outbound bridge target phone (E.164)", {
-        defaultValue: defaults.OUTBOUND_TARGET_E164,
-        required: true,
-        validate: (value) => {
-          if (!/^\+[1-9]\d{7,14}$/.test(value)) {
-            return "must be E.164 format like +15555550100";
-          }
-          return undefined;
-        },
-      }),
-      PUBLIC_BASE_URL: await prompt(rl, "Public base URL (for Twilio signature checks)", {
-        defaultValue: detectedPublicBaseUrl || defaults.PUBLIC_BASE_URL,
-      }),
-      TWILIO_PHONE_NUMBER: await prompt(rl, "Twilio DID number (optional)", {
-        defaultValue: defaults.TWILIO_PHONE_NUMBER,
-      }),
-      VOIPMS_DID: await prompt(rl, "VoIP.ms DID number (optional)", {
-        defaultValue: defaults.VOIPMS_DID,
-      }),
-      ASTERISK_SHARED_SECRET: await prompt(rl, "Asterisk shared secret (press Enter to accept)", {
+    await promptAndPersist("OUTBOUND_TARGET_E164", "Outbound bridge target phone (E.164)", {
+      defaultValue: defaults.OUTBOUND_TARGET_E164,
+      required: true,
+      validate: (value) => {
+        if (!/^\+[1-9]\d{7,14}$/.test(value)) {
+          return "must be E.164 format like +15555550100";
+        }
+        return undefined;
+      },
+    });
+    await promptAndPersist("PUBLIC_BASE_URL", "Public base URL (for Twilio signature checks)", {
+      defaultValue: detectedPublicBaseUrl || defaults.PUBLIC_BASE_URL,
+    });
+    await promptAndPersist("TWILIO_PHONE_NUMBER", "Twilio DID number (optional)", {
+      defaultValue: defaults.TWILIO_PHONE_NUMBER,
+    });
+    await promptAndPersist("VOIPMS_DID", "VoIP.ms DID number (optional)", {
+      defaultValue: defaults.VOIPMS_DID,
+    });
+    await promptAndPersist(
+      "ASTERISK_SHARED_SECRET",
+      "Asterisk shared secret (press Enter to accept)",
+      {
         defaultValue: defaults.ASTERISK_SHARED_SECRET,
         secret: true,
         required: true,
-      }),
-      CONTROL_API_SECRET: await prompt(rl, "Control API secret (press Enter to accept)", {
-        defaultValue: defaults.CONTROL_API_SECRET,
+      },
+    );
+    await promptAndPersist("CONTROL_API_SECRET", "Control API secret (press Enter to accept)", {
+      defaultValue: defaults.CONTROL_API_SECRET,
+      secret: true,
+      required: true,
+    });
+    await promptAndPersist(
+      "TWILIO_AUTH_TOKEN",
+      "Twilio auth token" +
+        ((updates.TWILIO_PHONE_NUMBER ?? "").trim().length > 0 ? " (required)" : " (optional)"),
+      {
+        defaultValue: defaults.TWILIO_AUTH_TOKEN,
         secret: true,
+        required: (updates.TWILIO_PHONE_NUMBER ?? "").trim().length > 0,
+      },
+    );
+    await promptWithHelpAndPersist(
+      "ASSEMBLYAI_API_KEY",
+      "AssemblyAI API key",
+      defaults.ASSEMBLYAI_API_KEY,
+      ["Create an account and generate an API key:", "  https://www.assemblyai.com/docs"],
+    );
+    await promptWithHelpAndPersist(
+      "GOOGLE_TRANSLATE_API_KEY",
+      "Google Translate API key",
+      defaults.GOOGLE_TRANSLATE_API_KEY,
+      [
+        "Enable Cloud Translation API (v2) and create an API key:",
+        "  https://cloud.google.com/translate/docs/basic/quickstart",
+      ],
+    );
+
+    const ttsProvider = await promptAndPersist(
+      "TTS_PROVIDER",
+      "TTS provider (polly/google)",
+      {
+        defaultValue: defaults.TTS_PROVIDER,
         required: true,
-      }),
-      TWILIO_AUTH_TOKEN: await prompt(
-        rl,
-        "Twilio auth token" +
-          ((defaults.TWILIO_PHONE_NUMBER ?? "").trim().length > 0 ? " (required)" : " (optional)"),
-        {
-          defaultValue: defaults.TWILIO_AUTH_TOKEN,
-          secret: true,
-          required: (defaults.TWILIO_PHONE_NUMBER ?? "").trim().length > 0,
+        validate: (value) => {
+          if (!["polly", "google"].includes(value)) {
+            return "must be 'polly' or 'google'";
+          }
+          return undefined;
         },
-      ),
-      ASSEMBLYAI_API_KEY: await promptWithHelp(
-        rl,
-        "AssemblyAI API key",
-        defaults.ASSEMBLYAI_API_KEY,
+      },
+    );
+
+    if (ttsProvider === "google") {
+      await promptWithHelpAndPersist(
+        "GOOGLE_TTS_API_KEY",
+        "Google TTS API key",
+        defaults.GOOGLE_TTS_API_KEY,
         [
-          "Create an account and generate an API key:",
-          "  https://www.assemblyai.com/docs",
+          "Enable Cloud Text-to-Speech API and create an API key:",
+          "  https://cloud.google.com/text-to-speech/docs/quickstart",
         ],
-      ),
-      GOOGLE_TRANSLATE_API_KEY: await promptWithHelp(
-        rl,
-        "Google Translate API key",
-        defaults.GOOGLE_TRANSLATE_API_KEY,
-        [
-          "Enable Cloud Translation API (v2) and create an API key:",
-          "  https://cloud.google.com/translate/docs/basic/quickstart",
-        ],
-      ),
-      AWS_ACCESS_KEY_ID: await promptWithHelp(
-        rl,
+      );
+      await promptAndPersist("GOOGLE_TTS_VOICE_EN", "Google TTS voice (en)", {
+        defaultValue: defaults.GOOGLE_TTS_VOICE_EN,
+        required: true,
+      });
+      await promptAndPersist("GOOGLE_TTS_VOICE_ES", "Google TTS voice (es)", {
+        defaultValue: defaults.GOOGLE_TTS_VOICE_ES,
+        required: true,
+      });
+    } else {
+      await promptWithHelpAndPersist(
+        "AWS_ACCESS_KEY_ID",
         "AWS access key ID",
         defaults.AWS_ACCESS_KEY_ID,
         [
           "Create an IAM user with Amazon Polly permissions and create access keys:",
           "  https://docs.aws.amazon.com/polly/latest/dg/setting-up.html",
         ],
-      ),
-      AWS_SECRET_ACCESS_KEY: await promptWithHelp(
-        rl,
+      );
+      await promptWithHelpAndPersist(
+        "AWS_SECRET_ACCESS_KEY",
         "AWS secret access key",
         defaults.AWS_SECRET_ACCESS_KEY,
         [
           "Use the secret access key from the same IAM user:",
           "  https://docs.aws.amazon.com/polly/latest/dg/setting-up.html",
         ],
-      ),
-      AWS_REGION: await prompt(rl, "AWS region", {
+      );
+      await promptAndPersist("AWS_REGION", "AWS region", {
         defaultValue: defaults.AWS_REGION,
         required: true,
-      }),
-      POLLY_VOICE_EN: await prompt(rl, "Polly English voice", {
+      });
+      await promptAndPersist("POLLY_VOICE_EN", "Polly English voice", {
         defaultValue: defaults.POLLY_VOICE_EN,
         required: true,
-      }),
-      POLLY_VOICE_ES: await prompt(rl, "Polly Spanish voice", {
+      });
+      await promptAndPersist("POLLY_VOICE_ES", "Polly Spanish voice", {
         defaultValue: defaults.POLLY_VOICE_ES,
         required: true,
-      }),
-      OPENCLAW_BRIDGE_URL: await prompt(rl, "OpenClaw bridge URL (optional)", {
-        defaultValue: defaults.OPENCLAW_BRIDGE_URL,
-      }),
-      OPENCLAW_BRIDGE_API_KEY: await prompt(rl, "OpenClaw bridge API key (optional)", {
-        defaultValue: defaults.OPENCLAW_BRIDGE_API_KEY,
-        secret: true,
-      }),
-      OPENCLAW_BRIDGE_TIMEOUT_MS: await prompt(rl, "OpenClaw bridge timeout ms", {
-        defaultValue: defaults.OPENCLAW_BRIDGE_TIMEOUT_MS,
-        required: true,
-        validate: (value) => {
-          const timeout = Number(value);
-          if (!Number.isFinite(timeout) || timeout < 100) return "must be a number >= 100";
-          return undefined;
-        },
-      }),
-    };
+      });
+    }
+
+    await promptAndPersist("OPENCLAW_BRIDGE_URL", "OpenClaw bridge URL (optional)", {
+      defaultValue: defaults.OPENCLAW_BRIDGE_URL,
+    });
+    await promptAndPersist("OPENCLAW_BRIDGE_API_KEY", "OpenClaw bridge API key (optional)", {
+      defaultValue: defaults.OPENCLAW_BRIDGE_API_KEY,
+      secret: true,
+    });
+    await promptAndPersist("OPENCLAW_BRIDGE_TIMEOUT_MS", "OpenClaw bridge timeout ms", {
+      defaultValue: defaults.OPENCLAW_BRIDGE_TIMEOUT_MS,
+      required: true,
+      validate: (value) => {
+        const timeout = Number(value);
+        if (!Number.isFinite(timeout) || timeout < 100) return "must be a number >= 100";
+        return undefined;
+      },
+    });
 
     if (!updates.TWILIO_PHONE_NUMBER && !updates.VOIPMS_DID) {
       const cont = await promptYesNo(
@@ -325,21 +388,29 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       }
     }
 
-    if (!updates.AWS_ACCESS_KEY_ID || !updates.AWS_SECRET_ACCESS_KEY) {
+    if (updates.TTS_PROVIDER === "polly") {
+      if (!updates.AWS_ACCESS_KEY_ID || !updates.AWS_SECRET_ACCESS_KEY) {
+        const cont = await promptYesNo(
+          rl,
+          "Missing Polly credentials; TTS will be disabled. Continue anyway?",
+          false,
+        );
+        if (!cont) {
+          throw new Error("install canceled: add Polly credentials then re-run install");
+        }
+      }
+    } else if (!updates.GOOGLE_TTS_API_KEY) {
       const cont = await promptYesNo(
         rl,
-        "Missing Polly credentials; TTS will be disabled. Continue anyway?",
+        "Missing Google TTS API key; TTS will be disabled. Continue anyway?",
         false,
       );
       if (!cont) {
-        throw new Error("install canceled: add Polly credentials then re-run install");
+        throw new Error("install canceled: add Google TTS API key then re-run install");
       }
     }
 
-    const mergedText = removeEnvKeys(applyEnvUpdates(currentText, updates), [
-      "DESTINATION_PHONE_E164",
-    ]);
-    writeFileSync(envPath, mergedText.endsWith("\n") ? mergedText : `${mergedText}\n`, "utf8");
+    updateEnvFile(envPath, updates, context.projectRoot);
 
     const publicBaseUrl = updates.PUBLIC_BASE_URL;
 
