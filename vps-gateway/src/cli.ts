@@ -109,7 +109,9 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
   const currentText = existsSync(envPath) ? readFileSync(envPath, "utf8") : templateText;
   const currentValues = parseEnvFile(currentText);
 
-  if (!process.stdin.isTTY) {
+  const ttyPath = "/dev/tty";
+  const hasTty = process.stdin.isTTY || existsSync(ttyPath);
+  if (!hasTty) {
     die("interactive install requires a TTY (run it in a real terminal, not a background pipe)");
   }
 
@@ -117,7 +119,10 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
   process.stdout.write(`[sandalphone] target env file: ${envPath}\n`);
   process.stdout.write(`[sandalphone] press Enter to keep shown default\n\n`);
 
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const rl = createInterface({
+    input: process.stdin.isTTY ? process.stdin : createReadStream(ttyPath),
+    output: process.stdout,
+  });
 
   try {
     const defaults: EnvMap = {
