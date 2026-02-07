@@ -69,6 +69,8 @@ prompt_required() {
   fi
   if [[ -t 0 ]]; then
     read -r -p "${label}: " value
+  elif [[ -t 1 && -e /dev/tty ]]; then
+    read -r -p "${label}: " value </dev/tty
   fi
   if [[ -z "${value}" ]]; then
     echo "[sandalphone] missing required: ${name}"
