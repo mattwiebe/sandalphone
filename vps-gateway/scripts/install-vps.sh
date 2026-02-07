@@ -91,6 +91,8 @@ ensure_tailscale() {
   if ! command -v tailscale >/dev/null 2>&1; then
     curl -fsSL https://tailscale.com/install.sh | sh
   fi
+  # Allow the app user to run `tailscale funnel` without sudo.
+  tailscale set --operator="${APP_USER}" >/dev/null 2>&1 || true
   local status
   status="$(tailscale status 2>/dev/null || true)"
   if [[ -n "${status}" ]] && ! echo "${status}" | grep -qi "logged out\|needs login"; then
