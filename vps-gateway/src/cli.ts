@@ -148,14 +148,10 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         "+15555550100",
       TWILIO_PHONE_NUMBER: currentValues.TWILIO_PHONE_NUMBER ?? "",
       VOIPMS_DID: currentValues.VOIPMS_DID ?? "",
-      ASTERISK_SHARED_SECRET: pickNonEmpty(
-        currentValues.ASTERISK_SHARED_SECRET,
-        randomBytes(16).toString("hex"),
-      ),
-      CONTROL_API_SECRET: pickNonEmpty(
-        currentValues.CONTROL_API_SECRET,
-        randomBytes(16).toString("hex"),
-      ),
+      ASTERISK_SHARED_SECRET:
+        pickNonEmpty(currentValues.ASTERISK_SHARED_SECRET) ?? randomBytes(16).toString("hex"),
+      CONTROL_API_SECRET:
+        pickNonEmpty(currentValues.CONTROL_API_SECRET) ?? randomBytes(16).toString("hex"),
       TWILIO_AUTH_TOKEN: currentValues.TWILIO_AUTH_TOKEN ?? "",
       ASSEMBLYAI_API_KEY: currentValues.ASSEMBLYAI_API_KEY ?? "",
       GOOGLE_TRANSLATE_API_KEY: currentValues.GOOGLE_TRANSLATE_API_KEY ?? "",
