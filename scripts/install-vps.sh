@@ -207,6 +207,12 @@ build_app() {
   sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && npm link"
 }
 
+install_cli_link() {
+  log "installing cli"
+  ln -sf "${APP_DIR}/dist/cli.js" /usr/local/bin/sandalphone
+  chmod +x /usr/local/bin/sandalphone
+}
+
 set_env_key() {
   local file="$1"
   local key="$2"
@@ -269,6 +275,7 @@ clone_repo
 ensure_tailscale
 setup_funnel
 build_app
+install_cli_link
 
 log "running CLI installer"
 if [[ -t 0 ]]; then
@@ -286,7 +293,7 @@ systemctl daemon-reload
 systemctl enable --now sandalphone-vps-gateway
 
 log "running deploy doctor"
-sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js doctor deploy"
+sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js doctor deploy --env-path ${APP_DIR}/.env"
 
 health_check
 
