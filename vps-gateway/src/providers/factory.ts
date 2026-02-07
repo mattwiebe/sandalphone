@@ -3,6 +3,7 @@ import type { Logger } from "../server/logger.js";
 import type { StreamingSttProvider, TranslationProvider, TtsProvider } from "../domain/providers.js";
 import { AssemblyAiRealtimeProvider, StubAssemblyAiProvider } from "./stt/assemblyai.js";
 import { GoogleTranslationProvider, StubGoogleTranslationProvider } from "./translation/google.js";
+import { GoogleTtsProvider } from "./tts/google.js";
 import { PollyStandardProvider, StubPollyProvider } from "./tts/polly.js";
 
 export type ProviderBundle = {
@@ -23,14 +24,24 @@ export function makeProviders(config: AppConfig, logger: Logger): ProviderBundle
     ? new GoogleTranslationProvider({ apiKey: config.googleTranslateApiKey })
     : new StubGoogleTranslationProvider();
 
-  const tts =
-    process.env.DISABLE_POLLY === "1"
-      ? new StubPollyProvider()
-      : new PollyStandardProvider({
-          region: config.awsRegion,
-          voiceEn: config.pollyVoiceEn,
-          voiceEs: config.pollyVoiceEs,
-        });
+  let tts: TtsProvider;
+  if (config.ttsProvider === "google") {
+    tts = config.googleTtsApiKey
+      ? new GoogleTtsProvider({
+          apiKey: config.googleTtsApiKey,
+          voiceEn: config.googleTtsVoiceEn,
+          voiceEs: config.googleTtsVoiceEs,
+        })
+      : new StubPollyProvider();
+  } else if (process.env.DISABLE_POLLY === "1") {
+    tts = new StubPollyProvider();
+  } else {
+    tts = new PollyStandardProvider({
+      region: config.awsRegion,
+      voiceEn: config.pollyVoiceEn,
+      voiceEs: config.pollyVoiceEs,
+    });
+  }
 
   logger.info("provider selection", {
     stt: stt.name,

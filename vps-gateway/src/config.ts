@@ -7,6 +7,10 @@ export interface AppConfig {
   readonly assemblyAiApiKey?: string;
   readonly assemblyAiRealtimeUrl?: string;
   readonly googleTranslateApiKey?: string;
+  readonly ttsProvider: "polly" | "google";
+  readonly googleTtsApiKey?: string;
+  readonly googleTtsVoiceEn: string;
+  readonly googleTtsVoiceEs: string;
   readonly awsRegion: string;
   readonly pollyVoiceEn: string;
   readonly pollyVoiceEs: string;
@@ -53,6 +57,10 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     assemblyAiApiKey: env.ASSEMBLYAI_API_KEY,
     assemblyAiRealtimeUrl: env.ASSEMBLYAI_REALTIME_URL,
     googleTranslateApiKey: env.GOOGLE_TRANSLATE_API_KEY,
+    ttsProvider: (env.TTS_PROVIDER ?? "polly") as AppConfig["ttsProvider"],
+    googleTtsApiKey: env.GOOGLE_TTS_API_KEY,
+    googleTtsVoiceEn: env.GOOGLE_TTS_VOICE_EN ?? "en-US-Standard-C",
+    googleTtsVoiceEs: env.GOOGLE_TTS_VOICE_ES ?? "es-US-Standard-A",
     awsRegion: env.AWS_REGION ?? "us-west-2",
     pollyVoiceEn: env.POLLY_VOICE_EN ?? "Joanna",
     pollyVoiceEs: env.POLLY_VOICE_ES ?? "Lupe",
