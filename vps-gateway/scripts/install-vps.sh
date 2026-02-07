@@ -8,7 +8,7 @@ fi
 
 APP_USER="${APP_USER:-sandalphone}"
 APP_DIR="${APP_DIR:-/opt/sandalphone/vps-gateway}"
-REPO_URL="${REPO_URL:-git@github.com:mattwiebe/sandalphone.git}"
+REPO_URL="${REPO_URL:-https://github.com/mattwiebe/sandalphone.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 PORT="${PORT:-8080}"
 
