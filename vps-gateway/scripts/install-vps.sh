@@ -13,23 +13,6 @@ REPO_BRANCH="${REPO_BRANCH:-main}"
 PORT="${PORT:-8080}"
 
 OUTBOUND_TARGET_E164="${OUTBOUND_TARGET_E164:-}"
-TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
-PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
-TWILIO_PHONE_NUMBER="${TWILIO_PHONE_NUMBER:-}"
-VOIPMS_DID="${VOIPMS_DID:-}"
-ASSEMBLYAI_API_KEY="${ASSEMBLYAI_API_KEY:-}"
-GOOGLE_TRANSLATE_API_KEY="${GOOGLE_TRANSLATE_API_KEY:-}"
-AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}"
-AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
-AWS_REGION="${AWS_REGION:-us-west-2}"
-POLLY_VOICE_EN="${POLLY_VOICE_EN:-Joanna}"
-POLLY_VOICE_ES="${POLLY_VOICE_ES:-Lupe}"
-OPENCLAW_BRIDGE_URL="${OPENCLAW_BRIDGE_URL:-}"
-OPENCLAW_BRIDGE_API_KEY="${OPENCLAW_BRIDGE_API_KEY:-}"
-OPENCLAW_BRIDGE_TIMEOUT_MS="${OPENCLAW_BRIDGE_TIMEOUT_MS:-1200}"
-
-ASTERISK_SHARED_SECRET="${ASTERISK_SHARED_SECRET:-}"
-CONTROL_API_SECRET="${CONTROL_API_SECRET:-}"
 
 TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
 TAILSCALE_HOSTNAME="${TAILSCALE_HOSTNAME:-sandalphone}"
@@ -228,8 +211,6 @@ health_check() {
   curl -fsSL "http://127.0.0.1:${PORT}/health" >/dev/null
 }
 
-prompt_required OUTBOUND_TARGET_E164 "Outbound target phone (E.164)"
-
 print_api_key_guide
 
 ensure_deps
@@ -240,14 +221,19 @@ clone_repo
 ensure_tailscale
 setup_funnel
 build_app
-write_env
-install_service
+
+log "running CLI installer"
+sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js install"
+
+log "installing systemd unit"
+sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js service print-unit" > /etc/systemd/system/sandalphone-vps-gateway.service
+systemctl daemon-reload
+systemctl enable --now sandalphone-vps-gateway
+
+log "running deploy doctor"
+sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js doctor deploy"
+
 health_check
 
 log "install complete"
-if [[ -n "${PUBLIC_BASE_URL}" ]]; then
-  log "Twilio Voice webhook: ${PUBLIC_BASE_URL}/twilio/voice"
-  log "Twilio Media Stream: wss://${PUBLIC_BASE_URL#https://}/twilio/stream"
-else
-  log "PUBLIC_BASE_URL not set; configure and restart service"
-fi
+sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js urls"
