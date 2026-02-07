@@ -16,6 +16,7 @@ OUTBOUND_TARGET_E164="${OUTBOUND_TARGET_E164:-}"
 
 TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
 TAILSCALE_HOSTNAME="${TAILSCALE_HOSTNAME:-sandalphone}"
+TAILSCALE_READY="0"
 
 log() {
   echo "[sandalphone] $*"
@@ -104,6 +105,30 @@ ensure_tailscale() {
   else
     log "TAILSCALE_AUTHKEY not set; skipping tailscale up"
   fi
+  local status
+  status="$(tailscale status 2>/dev/null || true)"
+  if [[ -n "${status}" ]] && echo "${status}" | grep -qi "logged out\|needs login"; then
+    if [[ -t 0 ]] || [[ -t 1 && -e /dev/tty ]]; then
+      log "tailscale needs login; run it now to enable funnel"
+      if [[ -t 0 ]]; then
+        read -r -p "Run 'tailscale up --ssh --hostname ${TAILSCALE_HOSTNAME}' now? [Y/n]: " reply
+      else
+        read -r -p "Run 'tailscale up --ssh --hostname ${TAILSCALE_HOSTNAME}' now? [Y/n]: " reply </dev/tty
+      fi
+      reply="${reply:-Y}"
+      if [[ "${reply}" =~ ^[Yy]$ ]]; then
+        tailscale up --ssh --hostname "${TAILSCALE_HOSTNAME}" || true
+      else
+        log "skipping tailscale login; funnel will be skipped"
+      fi
+    else
+      log "tailscale not logged in; run: tailscale up --ssh --hostname ${TAILSCALE_HOSTNAME}"
+    fi
+  fi
+  status="$(tailscale status 2>/dev/null || true)"
+  if [[ -n "${status}" ]] && ! echo "${status}" | grep -qi "logged out\|needs login"; then
+    TAILSCALE_READY="1"
+  fi
 }
 
 discover_funnel_url() {
@@ -124,8 +149,8 @@ setup_funnel() {
   log "configuring tailscale funnel"
   local status
   status="$(tailscale status 2>/dev/null || true)"
-  if [[ -z "${status}" ]] || echo "${status}" | grep -qi "logged out"; then
-    log "tailscale not logged in; run 'tailscale up' then re-run install"
+  if [[ "${TAILSCALE_READY}" != "1" ]] || [[ -z "${status}" ]] || echo "${status}" | grep -qi "logged out\|needs login"; then
+    log "tailscale not logged in; run 'tailscale up --ssh --hostname ${TAILSCALE_HOSTNAME}' then re-run install"
     return 0
   fi
   if ! tailscale funnel --bg --yes "${PORT}"; then
