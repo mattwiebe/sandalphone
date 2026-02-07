@@ -122,6 +122,12 @@ discover_funnel_url() {
 
 setup_funnel() {
   log "configuring tailscale funnel"
+  local status
+  status="$(tailscale status 2>/dev/null || true)"
+  if [[ -z "${status}" ]] || echo "${status}" | grep -qi "logged out"; then
+    log "tailscale not logged in; run 'tailscale up' then re-run install"
+    return 0
+  fi
   if ! tailscale funnel --bg --yes "${PORT}"; then
     log "funnel not enabled or failed; check https://login.tailscale.com/f/funnel"
     return 0
@@ -143,6 +149,10 @@ clone_repo() {
   else
     log "cloning repo"
     sudo -u "${APP_USER}" -H bash -lc "mkdir -p ${APP_DIR} && git clone ${REPO_URL} ${APP_DIR} && cd ${APP_DIR} && git checkout ${REPO_BRANCH}"
+  fi
+  if [[ ! -f "${APP_DIR}/package.json" ]]; then
+    log "clone failed or repo incomplete at ${APP_DIR}"
+    exit 1
   fi
 }
 
