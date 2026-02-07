@@ -91,6 +91,12 @@ ensure_tailscale() {
   if ! command -v tailscale >/dev/null 2>&1; then
     curl -fsSL https://tailscale.com/install.sh | sh
   fi
+  local status
+  status="$(tailscale status 2>/dev/null || true)"
+  if [[ -n "${status}" ]] && ! echo "${status}" | grep -qi "logged out\|needs login"; then
+    TAILSCALE_READY="1"
+    return 0
+  fi
   if [[ -z "${TAILSCALE_AUTHKEY}" ]]; then
     if [[ -t 0 ]] || [[ -t 1 && -e /dev/tty ]]; then
       log "TAILSCALE_AUTHKEY not set"
@@ -116,7 +122,6 @@ ensure_tailscale() {
     log "bringing up tailscale"
     tailscale up --authkey "${TAILSCALE_AUTHKEY}" --hostname "${TAILSCALE_HOSTNAME}" --ssh || true
   fi
-  local status
   status="$(tailscale status 2>/dev/null || true)"
   if [[ -n "${status}" ]] && echo "${status}" | grep -qi "logged out\|needs login"; then
     if [[ -t 0 ]] || [[ -t 1 && -e /dev/tty ]]; then
