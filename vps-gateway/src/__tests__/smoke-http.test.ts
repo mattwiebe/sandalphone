@@ -14,12 +14,15 @@ import { makeOpenClawBridge } from "../integrations/openclaw.js";
 class SmokeStt {
   public readonly name = "smoke-stt";
 
-  public async transcribe(frame: AudioFrame): Promise<TranscriptionChunk | null> {
+  public async transcribe(
+    frame: AudioFrame,
+    sourceLanguage: "en" | "es",
+  ): Promise<TranscriptionChunk | null> {
     return {
       sessionId: frame.sessionId,
       text: "hola",
       isFinal: true,
-      language: "es",
+      language: sourceLanguage,
       timestampMs: Date.now(),
     };
   }

@@ -1,10 +1,9 @@
 import type { AppConfig } from "../config.js";
 import type { Logger } from "../server/logger.js";
 import type { StreamingSttProvider, TranslationProvider, TtsProvider } from "../domain/providers.js";
-import { AssemblyAiRealtimeProvider, StubAssemblyAiProvider } from "./stt/assemblyai.js";
+import { GoogleSpeechProvider, StubGoogleSttProvider } from "./stt/google.js";
 import { GoogleTranslationProvider, StubGoogleTranslationProvider } from "./translation/google.js";
-import { GoogleTtsProvider } from "./tts/google.js";
-import { PollyStandardProvider, StubPollyProvider } from "./tts/polly.js";
+import { GoogleTtsProvider, StubGoogleTtsProvider } from "./tts/google.js";
 
 export type ProviderBundle = {
   readonly stt: StreamingSttProvider;
@@ -13,35 +12,21 @@ export type ProviderBundle = {
 };
 
 export function makeProviders(config: AppConfig, logger: Logger): ProviderBundle {
-  const stt = config.assemblyAiApiKey
-    ? new AssemblyAiRealtimeProvider({
-        apiKey: config.assemblyAiApiKey,
-        url: config.assemblyAiRealtimeUrl,
-      })
-    : new StubAssemblyAiProvider(config.stubSttText ?? "");
+  const stt = config.googleCloudApiKey
+    ? new GoogleSpeechProvider({ apiKey: config.googleCloudApiKey })
+    : new StubGoogleSttProvider(config.stubSttText ?? "");
 
-  const translator = config.googleTranslateApiKey
-    ? new GoogleTranslationProvider({ apiKey: config.googleTranslateApiKey })
+  const translator = config.googleCloudApiKey
+    ? new GoogleTranslationProvider({ apiKey: config.googleCloudApiKey })
     : new StubGoogleTranslationProvider();
 
-  let tts: TtsProvider;
-  if (config.ttsProvider === "google") {
-    tts = config.googleTtsApiKey
-      ? new GoogleTtsProvider({
-          apiKey: config.googleTtsApiKey,
-          voiceEn: config.googleTtsVoiceEn,
-          voiceEs: config.googleTtsVoiceEs,
-        })
-      : new StubPollyProvider();
-  } else if (process.env.DISABLE_POLLY === "1") {
-    tts = new StubPollyProvider();
-  } else {
-    tts = new PollyStandardProvider({
-      region: config.awsRegion,
-      voiceEn: config.pollyVoiceEn,
-      voiceEs: config.pollyVoiceEs,
-    });
-  }
+  const tts: TtsProvider = config.googleCloudApiKey
+    ? new GoogleTtsProvider({
+        apiKey: config.googleCloudApiKey,
+        voiceEn: config.googleTtsVoiceEn,
+        voiceEs: config.googleTtsVoiceEs,
+      })
+    : new StubGoogleTtsProvider();
 
   logger.info("provider selection", {
     stt: stt.name,

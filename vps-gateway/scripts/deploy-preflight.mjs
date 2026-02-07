@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const optionalCloud = ["ASSEMBLYAI_API_KEY", "GOOGLE_TRANSLATE_API_KEY"];
+const optionalCloud = ["GOOGLE_CLOUD_API_KEY"];
 const warnings = [];
 const failures = [];
 

@@ -129,7 +129,7 @@ export class VoiceOrchestrator {
     this.lastFrameAtMs.set(frame.sessionId, frame.timestampMs);
 
     const sttStart = Date.now();
-    const transcript = await this.deps.stt.transcribe(frame);
+    const transcript = await this.deps.stt.transcribe(frame, session.sourceLanguage);
     const sttLatencyMs = Date.now() - sttStart;
 
     if (!transcript || !transcript.text.trim()) {

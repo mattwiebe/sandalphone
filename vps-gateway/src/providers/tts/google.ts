@@ -11,6 +11,14 @@ type GoogleTtsResponse = {
   audioContent?: string;
 };
 
+export class StubGoogleTtsProvider implements TtsProvider {
+  public readonly name = "google-tts-stub";
+
+  public async synthesize(_chunk: TranslationChunk): Promise<TtsChunk | null> {
+    return null;
+  }
+}
+
 export class GoogleTtsProvider implements TtsProvider {
   public readonly name = "google-tts";
 

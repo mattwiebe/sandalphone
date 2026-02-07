@@ -14,7 +14,7 @@ Runnable gateway with:
 - Asterisk media ingestion endpoint (`/asterisk/media`)
 - Session control endpoint (`/sessions/control`)
 - OpenClaw command relay (`/openclaw/command`)
-- Provider factory with cloud/stub selection (AssemblyAI realtime, Google Translate v2, Polly Standard)
+- Provider factory with cloud/stub selection (Google Cloud STT + Translate + TTS)
 
 ## Run
 1. Install deps: `npm install`
@@ -47,10 +47,7 @@ Example:
 OUTBOUND_TARGET_E164=+15555550100 \
 TAILSCALE_AUTHKEY=tskey-... \
 TWILIO_AUTH_TOKEN=... \
-ASSEMBLYAI_API_KEY=... \
-GOOGLE_TRANSLATE_API_KEY=... \
-AWS_ACCESS_KEY_ID=... \
-AWS_SECRET_ACCESS_KEY=... \
+GOOGLE_CLOUD_API_KEY=... \
 curl -fsSL https://raw.githubusercontent.com/mattwiebe/sandalphone/main/vps-gateway/scripts/install-vps.sh | sudo bash
 ```
 
@@ -204,8 +201,8 @@ If auto-detection fails, run `tailscale funnel status`, copy the `https://...` h
 ## Runtime Notes
 - This scaffold is stateless in-memory; restart loses active sessions.
 - `SIGINT` and `SIGTERM` are handled for clean service shutdown.
-- Missing provider keys degrade to stubs (except Polly, enabled by default unless `DISABLE_POLLY=1`).
-- For local E2E testing without cloud keys, set `STUB_STT_TEXT` and `DISABLE_POLLY=1`.
+- Missing Google Cloud API key degrades to stub providers.
+- For local E2E testing without cloud keys, set `STUB_STT_TEXT`.
 - If `TWILIO_AUTH_TOKEN` is set, `/twilio/voice` enforces `X-Twilio-Signature`.
 
 ## Integration Contracts
@@ -333,13 +330,9 @@ Alternative locator:
 - `CONTROL_API_SECRET` (recommended; required as `x-control-secret` header for `/sessions/control` and `/openclaw/command` when set)
 - `PIPELINE_MIN_FRAME_INTERVAL_MS` (default `400`; throttles STT calls per session to control API churn)
 - `EGRESS_MAX_QUEUE_PER_SESSION` (default `64`; bounds queued translated chunks per call)
-- `ASSEMBLYAI_API_KEY` (enables realtime AssemblyAI STT)
-- `ASSEMBLYAI_REALTIME_URL` (optional override for realtime WS URL)
-- `GOOGLE_TRANSLATE_API_KEY` (enables Google Translate v2 REST provider)
-- `AWS_REGION` (default `us-west-2`)
-- `POLLY_VOICE_EN` (default `Joanna`)
-- `POLLY_VOICE_ES` (default `Lupe`)
-- `DISABLE_POLLY` (`1` forces local stub TTS provider)
+- `GOOGLE_CLOUD_API_KEY` (enables Google Cloud STT + Translate + TTS)
+- `GOOGLE_TTS_VOICE_EN` (default `en-US-Standard-C`)
+- `GOOGLE_TTS_VOICE_ES` (default `es-US-Standard-A`)
 - `STUB_STT_TEXT` (optional text emitted by stub STT provider for local e2e validation)
 - `TWILIO_AUTH_TOKEN` (optional; enables Twilio signature validation)
 - `PUBLIC_BASE_URL` (optional override for signature URL, e.g. `https://voice.yourdomain.com`)
