@@ -109,6 +109,10 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
   const currentText = existsSync(envPath) ? readFileSync(envPath, "utf8") : templateText;
   const currentValues = parseEnvFile(currentText);
 
+  if (!process.stdin.isTTY) {
+    die("interactive install requires a TTY (run it in a real terminal, not a background pipe)");
+  }
+
   process.stdout.write(`[sandalphone] interactive install\n`);
   process.stdout.write(`[sandalphone] target env file: ${envPath}\n`);
   process.stdout.write(`[sandalphone] press Enter to keep shown default\n\n`);
@@ -203,26 +207,46 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         secret: true,
         required: true,
       }),
-      TWILIO_AUTH_TOKEN: await prompt(rl, "Twilio auth token", {
+      TWILIO_AUTH_TOKEN: await prompt(rl, "Twilio auth token (optional)", {
         defaultValue: defaults.TWILIO_AUTH_TOKEN,
         secret: true,
       }),
-      ASSEMBLYAI_API_KEY: await prompt(rl, "AssemblyAI API key", {
-        defaultValue: defaults.ASSEMBLYAI_API_KEY,
-        secret: true,
-      }),
-      GOOGLE_TRANSLATE_API_KEY: await prompt(rl, "Google Translate API key", {
-        defaultValue: defaults.GOOGLE_TRANSLATE_API_KEY,
-        secret: true,
-      }),
-      AWS_ACCESS_KEY_ID: await prompt(rl, "AWS access key ID", {
-        defaultValue: defaults.AWS_ACCESS_KEY_ID,
-        secret: true,
-      }),
-      AWS_SECRET_ACCESS_KEY: await prompt(rl, "AWS secret access key", {
-        defaultValue: defaults.AWS_SECRET_ACCESS_KEY,
-        secret: true,
-      }),
+      ASSEMBLYAI_API_KEY: await promptWithHelp(
+        rl,
+        "AssemblyAI API key",
+        defaults.ASSEMBLYAI_API_KEY,
+        [
+          "Create an account and generate an API key:",
+          "  https://www.assemblyai.com/docs",
+        ],
+      ),
+      GOOGLE_TRANSLATE_API_KEY: await promptWithHelp(
+        rl,
+        "Google Translate API key",
+        defaults.GOOGLE_TRANSLATE_API_KEY,
+        [
+          "Enable Cloud Translation API (v2) and create an API key:",
+          "  https://cloud.google.com/translate/docs/basic/quickstart",
+        ],
+      ),
+      AWS_ACCESS_KEY_ID: await promptWithHelp(
+        rl,
+        "AWS access key ID",
+        defaults.AWS_ACCESS_KEY_ID,
+        [
+          "Create an IAM user with Amazon Polly permissions and create access keys:",
+          "  https://docs.aws.amazon.com/polly/latest/dg/setting-up.html",
+        ],
+      ),
+      AWS_SECRET_ACCESS_KEY: await promptWithHelp(
+        rl,
+        "AWS secret access key",
+        defaults.AWS_SECRET_ACCESS_KEY,
+        [
+          "Use the secret access key from the same IAM user:",
+          "  https://docs.aws.amazon.com/polly/latest/dg/setting-up.html",
+        ],
+      ),
       AWS_REGION: await prompt(rl, "AWS region", {
         defaultValue: defaults.AWS_REGION,
         required: true,
@@ -252,6 +276,39 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         },
       }),
     };
+
+    if (!updates.TWILIO_PHONE_NUMBER && !updates.VOIPMS_DID) {
+      const cont = await promptYesNo(
+        rl,
+        "No inbound DID configured (Twilio or VoIP.ms). Continue anyway?",
+        false,
+      );
+      if (!cont) {
+        throw new Error("install canceled: configure a DID then re-run install");
+      }
+    }
+
+    if (!updates.ASSEMBLYAI_API_KEY || !updates.GOOGLE_TRANSLATE_API_KEY) {
+      const cont = await promptYesNo(
+        rl,
+        "Missing translation API keys; calls will not translate. Continue anyway?",
+        false,
+      );
+      if (!cont) {
+        throw new Error("install canceled: add translation API keys then re-run install");
+      }
+    }
+
+    if (!updates.AWS_ACCESS_KEY_ID || !updates.AWS_SECRET_ACCESS_KEY) {
+      const cont = await promptYesNo(
+        rl,
+        "Missing Polly credentials; TTS will be disabled. Continue anyway?",
+        false,
+      );
+      if (!cont) {
+        throw new Error("install canceled: add Polly credentials then re-run install");
+      }
+    }
 
     const mergedText = removeEnvKeys(applyEnvUpdates(currentText, updates), [
       "DESTINATION_PHONE_E164",
@@ -516,6 +573,24 @@ async function prompt(
     }
 
     return value;
+  }
+}
+
+async function promptWithHelp(
+  rl: ReturnType<typeof createInterface>,
+  label: string,
+  defaultValue: string | undefined,
+  helpLines: string[],
+): Promise<string> {
+  while (true) {
+    const value = await prompt(rl, label, { defaultValue, secret: true });
+    if (value.length > 0) return value;
+    process.stdout.write(`\n[sandalphone] ${label} is required for real-time translation.\n`);
+    for (const line of helpLines) {
+      process.stdout.write(`${line}\n`);
+    }
+    const skip = await promptYesNo(rl, "Skip for now?", false);
+    if (skip) return "";
   }
 }
 
