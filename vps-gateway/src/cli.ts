@@ -38,6 +38,13 @@ type CommandResult = {
   timedOut?: boolean;
 };
 
+function pickNonEmpty(...values: Array<string | undefined>): string | undefined {
+  for (const value of values) {
+    if (value && value.trim().length > 0) return value;
+  }
+  return undefined;
+}
+
 async function main(argv: string[]): Promise<void> {
   const context: CliContext = {
     projectRoot: resolve(dirname(fileURLToPath(import.meta.url)), ".."),
@@ -141,9 +148,14 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         "+15555550100",
       TWILIO_PHONE_NUMBER: currentValues.TWILIO_PHONE_NUMBER ?? "",
       VOIPMS_DID: currentValues.VOIPMS_DID ?? "",
-      ASTERISK_SHARED_SECRET:
-        currentValues.ASTERISK_SHARED_SECRET ?? randomBytes(16).toString("hex"),
-      CONTROL_API_SECRET: currentValues.CONTROL_API_SECRET ?? randomBytes(16).toString("hex"),
+      ASTERISK_SHARED_SECRET: pickNonEmpty(
+        currentValues.ASTERISK_SHARED_SECRET,
+        randomBytes(16).toString("hex"),
+      ),
+      CONTROL_API_SECRET: pickNonEmpty(
+        currentValues.CONTROL_API_SECRET,
+        randomBytes(16).toString("hex"),
+      ),
       TWILIO_AUTH_TOKEN: currentValues.TWILIO_AUTH_TOKEN ?? "",
       ASSEMBLYAI_API_KEY: currentValues.ASSEMBLYAI_API_KEY ?? "",
       GOOGLE_TRANSLATE_API_KEY: currentValues.GOOGLE_TRANSLATE_API_KEY ?? "",
@@ -209,12 +221,12 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       VOIPMS_DID: await prompt(rl, "VoIP.ms DID number (optional)", {
         defaultValue: defaults.VOIPMS_DID,
       }),
-      ASTERISK_SHARED_SECRET: await prompt(rl, "Asterisk shared secret", {
+      ASTERISK_SHARED_SECRET: await prompt(rl, "Asterisk shared secret (press Enter to accept)", {
         defaultValue: defaults.ASTERISK_SHARED_SECRET,
         secret: true,
         required: true,
       }),
-      CONTROL_API_SECRET: await prompt(rl, "Control API secret", {
+      CONTROL_API_SECRET: await prompt(rl, "Control API secret (press Enter to accept)", {
         defaultValue: defaults.CONTROL_API_SECRET,
         secret: true,
         required: true,
