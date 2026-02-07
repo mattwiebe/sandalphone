@@ -271,7 +271,14 @@ setup_funnel
 build_app
 
 log "running CLI installer"
-sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js install"
+if [[ -t 0 ]]; then
+  sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js install"
+elif [[ -e /dev/tty ]]; then
+  sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js install" </dev/tty
+else
+  log "no TTY available; re-run installer from a real terminal to complete interactive setup"
+  exit 1
+fi
 
 log "installing systemd unit"
 sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && node dist/cli.js service print-unit" > /etc/systemd/system/sandalphone-vps-gateway.service
