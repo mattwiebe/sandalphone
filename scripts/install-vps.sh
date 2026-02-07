@@ -203,6 +203,8 @@ build_app() {
   sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && npm install"
   log "building"
   sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && npm run build"
+  log "linking cli"
+  sudo -u "${APP_USER}" -H bash -lc "cd ${APP_DIR} && npm link"
 }
 
 set_env_key() {

@@ -4,17 +4,36 @@ const optionalCloud = ["GOOGLE_CLOUD_API_KEY"];
 const warnings = [];
 const failures = [];
 
-const outboundTarget = process.env.OUTBOUND_TARGET_E164 ?? process.env.DESTINATION_PHONE_E164 ?? "";
+const fs = require("node:fs");
+const path = require("node:path");
+
+const envPath = process.env.ENV_PATH
+  ? path.resolve(process.env.ENV_PATH)
+  : path.resolve(process.cwd(), ".env");
+
+if (fs.existsSync(envPath)) {
+  const text = fs.readFileSync(envPath, "utf8");
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const idx = line.indexOf("=");
+    if (idx === -1) continue;
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    if (!(key in process.env)) {
+      process.env[key] = value;
+    }
+  }
+}
+
+const outboundTarget = process.env.OUTBOUND_TARGET_E164 ?? "";
 if (!outboundTarget) {
-  failures.push("OUTBOUND_TARGET_E164 is required (legacy fallback: DESTINATION_PHONE_E164)");
+  failures.push("OUTBOUND_TARGET_E164 is required");
 }
 if (outboundTarget && !/^\+[1-9]\d{7,14}$/.test(outboundTarget)) {
   failures.push(
-    "OUTBOUND_TARGET_E164 must be E.164 format, e.g. +15555550100 (legacy fallback: DESTINATION_PHONE_E164)",
+    "OUTBOUND_TARGET_E164 must be E.164 format, e.g. +15555550100",
   );
-}
-if (!process.env.OUTBOUND_TARGET_E164 && process.env.DESTINATION_PHONE_E164) {
-  warnings.push("Using legacy DESTINATION_PHONE_E164; migrate to OUTBOUND_TARGET_E164");
 }
 
 if (process.env.TWILIO_AUTH_TOKEN && !process.env.PUBLIC_BASE_URL) {

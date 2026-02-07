@@ -335,22 +335,28 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
 
     process.stdout.write(`\n[sandalphone] wrote env file: ${envPath}\n`);
     process.stdout.write("[sandalphone] next steps:\n");
-    process.stdout.write("  1. sandalphone doctor deploy\n");
+    let step = 1;
+    process.stdout.write(`  ${step}. sandalphone doctor deploy\n`);
+    step += 1;
 
     if (!publicBaseUrl) {
-      process.stdout.write("  2. Expose local service with a public HTTPS tunnel (Twilio cannot reach private IP:port)\n");
+      process.stdout.write(
+        `  ${step}. Expose local service with a public HTTPS tunnel (Twilio cannot reach private IP:port)\n`,
+      );
       process.stdout.write("     Example with Tailscale Funnel:\n");
       process.stdout.write(`       sandalphone funnel up --port ${updates.PORT}\n`);
       process.stdout.write("       # then set PUBLIC_BASE_URL in .env to the shown https://... URL\n");
       printManualFunnelUrlSteps(updates.PORT);
+      step += 1;
     }
 
     const base = publicBaseUrl || "https://<your-public-funnel-domain>";
-    process.stdout.write("  3. Configure Twilio:\n");
+    process.stdout.write(`  ${step}. Configure Twilio:\n`);
     process.stdout.write(`     - Voice webhook: ${base}/twilio/voice\n`);
     process.stdout.write(`     - Media stream WS: wss://${stripScheme(base)}/twilio/stream\n`);
-    process.stdout.write("  4. Start service locally and run smoke:\n");
-    process.stdout.write("     - sandalphone start\n");
+    step += 1;
+    process.stdout.write(`  ${step}. Start service locally and run smoke:\n`);
+    process.stdout.write("     - node dist/index.js\n");
     process.stdout.write(`     - sandalphone smoke live --base-url ${base}\n`);
   } finally {
     rl.close();
@@ -682,9 +688,8 @@ function handleDoctor(args: string[], context: CliContext): void {
 
   const { flags } = parseFlags(args.slice(1));
   const env: Dict = {};
-  if (flags["env-path"]) {
-    env.ENV_PATH = resolve(context.projectRoot, flags["env-path"]);
-  }
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  env.ENV_PATH = envPath;
 
   if (mode === "local") {
     runNodeScript("scripts/doctor-local.mjs", context, env);
