@@ -190,9 +190,6 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
 
     const updates: EnvMap = {
       PORT: selectedPort,
-      PUBLIC_BASE_URL: await prompt(rl, "Public base URL (for Twilio signature checks)", {
-        defaultValue: detectedPublicBaseUrl || defaults.PUBLIC_BASE_URL,
-      }),
       OUTBOUND_TARGET_E164: await prompt(rl, "Outbound bridge target phone (E.164)", {
         defaultValue: defaults.OUTBOUND_TARGET_E164,
         required: true,
@@ -202,6 +199,9 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
           }
           return undefined;
         },
+      }),
+      PUBLIC_BASE_URL: await prompt(rl, "Public base URL (for Twilio signature checks)", {
+        defaultValue: detectedPublicBaseUrl || defaults.PUBLIC_BASE_URL,
       }),
       TWILIO_PHONE_NUMBER: await prompt(rl, "Twilio DID number (optional)", {
         defaultValue: defaults.TWILIO_PHONE_NUMBER,
