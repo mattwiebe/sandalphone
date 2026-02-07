@@ -64,14 +64,11 @@ if (!existsSync(envPath)) {
 }
 
 const env = existsSync(envPath) ? parseEnv(readFileSync(envPath, "utf8")) : {};
-const legacyOutbound = env.DESTINATION_PHONE_E164 ?? "";
-const outboundTarget = env.OUTBOUND_TARGET_E164 ?? legacyOutbound ?? "";
+const outboundTarget = env.OUTBOUND_TARGET_E164 ?? "";
 if (!outboundTarget) {
   failures.push("OUTBOUND_TARGET_E164 is missing");
 } else if (!/^\+[1-9]\d{7,14}$/.test(outboundTarget)) {
   failures.push("OUTBOUND_TARGET_E164 must be E.164 (example: +15555550100)");
-} else if (!env.OUTBOUND_TARGET_E164 && legacyOutbound) {
-  warnings.push("DESTINATION_PHONE_E164 is deprecated; rename to OUTBOUND_TARGET_E164");
 }
 
 const publicBaseUrl = env.PUBLIC_BASE_URL ?? "";

@@ -26,14 +26,11 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const legacyOutbound = process.env.DESTINATION_PHONE_E164 ?? "";
-const outboundTarget = process.env.OUTBOUND_TARGET_E164 ?? legacyOutbound ?? "";
+const outboundTarget = process.env.OUTBOUND_TARGET_E164 ?? "";
 if (!outboundTarget) {
   failures.push("OUTBOUND_TARGET_E164 is required");
 } else if (!/^\+[1-9]\d{7,14}$/.test(outboundTarget)) {
   failures.push("OUTBOUND_TARGET_E164 must be E.164 format, e.g. +15555550100");
-} else if (!process.env.OUTBOUND_TARGET_E164 && legacyOutbound) {
-  warnings.push("DESTINATION_PHONE_E164 is deprecated; rename to OUTBOUND_TARGET_E164");
 }
 
 if (process.env.TWILIO_AUTH_TOKEN && !process.env.PUBLIC_BASE_URL) {

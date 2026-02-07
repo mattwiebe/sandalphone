@@ -14,7 +14,7 @@ import { createInterface } from "node:readline/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir, platform } from "node:os";
-import { applyEnvUpdates, parseEnvFile, removeEnvKeys, type EnvMap } from "./cli-env-file.js";
+import { applyEnvUpdates, parseEnvFile, type EnvMap } from "./cli-env-file.js";
 import { extractFunnelUrl, extractFunnelUrlFromText } from "./cli-funnel.js";
 
 type Dict = Record<string, string | undefined>;
@@ -147,9 +147,7 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       PORT: currentValues.PORT ?? "8080",
       PUBLIC_BASE_URL: currentValues.PUBLIC_BASE_URL ?? "",
       OUTBOUND_TARGET_E164:
-        currentValues.OUTBOUND_TARGET_E164 ??
-        currentValues.DESTINATION_PHONE_E164 ??
-        "+15555550100",
+        currentValues.OUTBOUND_TARGET_E164 ?? "+15555550100",
       TWILIO_PHONE_NUMBER: currentValues.TWILIO_PHONE_NUMBER ?? "",
       VOIPMS_DID: currentValues.VOIPMS_DID ?? "",
       ASTERISK_SHARED_SECRET:
@@ -561,7 +559,7 @@ function updateEnvFile(envPath: string, updates: EnvMap, projectRoot: string): v
       ? readFileSync(templatePath, "utf8")
       : "";
 
-  const merged = removeEnvKeys(applyEnvUpdates(sourceText, updates), ["DESTINATION_PHONE_E164"]);
+  const merged = applyEnvUpdates(sourceText, updates);
   writeFileSync(envPath, merged.endsWith("\n") ? merged : `${merged}\n`, "utf8");
 }
 

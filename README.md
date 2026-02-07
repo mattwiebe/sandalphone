@@ -322,7 +322,6 @@ Alternative locator:
 ## Env
 - `PORT` (default `8080`)
 - `OUTBOUND_TARGET_E164` (default `+15555550100`)
-- `DESTINATION_PHONE_E164` (legacy fallback only; migrate to `OUTBOUND_TARGET_E164`)
 - `TWILIO_PHONE_NUMBER` (optional metadata for your Twilio DID)
 - `VOIPMS_DID` (optional metadata for your VoIP.ms DID)
 - `LOG_LEVEL` (default `info`)
