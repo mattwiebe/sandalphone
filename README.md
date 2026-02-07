@@ -1,234 +1,422 @@
-# Levi - Voice-Driven AI Assistant
+# Sandalphone VPS Gateway (TypeScript)
 
-A voice-first AI assistant focused on real-time Spanish/English translation, with plans to expand into a full personal assistant for restaurant operations and daily tasks.
+TypeScript-first runtime for the VPS architecture:
+- Inbound call ingress (VoIP.ms via Asterisk bridge, Twilio webhook/stream)
+- Streaming STT -> translation -> TTS orchestration
+- Default behavior: inbound calls ring destination phone leg with private translation mix
 
-## Project Status: Phase 2 - Ready for Deployment! 🚀
+## Status
+Runnable gateway with:
+- Session lifecycle tracking
+- Twilio voice webhook handling (`/twilio/voice`)
+- Twilio media stream websocket upgrade path (`/twilio/stream`)
+- Asterisk inbound bridge endpoint (`/asterisk/inbound`)
+- Asterisk media ingestion endpoint (`/asterisk/media`)
+- Session control endpoint (`/sessions/control`)
+- OpenClaw command relay (`/openclaw/command`)
+- Provider factory with cloud/stub selection (Google Cloud STT + Translate + TTS)
 
-**What's Working:**
-- ✅ **Phase 1**: Local translation pipeline (STT → Translation → TTS)
-- ✅ **Phase 2**: WebSocket server + Telegram bot (ready to deploy!)
+## Run
+1. Install deps: `npm install`
+2. Build once: `npm run build`
+3. Configure env interactively: `sandalphone install`
+   - Installer can run Tailscale Funnel and auto-fill `PUBLIC_BASE_URL`.
+4. Use CLI: `sandalphone help`
+5. Typecheck: `sandalphone check`
+6. Tests: `sandalphone test`
+7. Start dev server: `sandalphone dev`
 
-**Components:**
-- ✅ Whisper.cpp with Metal acceleration (16x real-time on M4 Max)
-- ✅ Qwen2.5-7B-Instruct (4-bit quantized) for translation
-- ✅ FastAPI WebSocket server for remote access
-- ✅ Telegram bot with voice message handling
-- ✅ Tailscale setup for secure Mac ↔ Cloud connection
+## VPS Install (Ubuntu 22.04 + Tailscale Funnel)
+One-shot installer (runs as root, uses SSH repo clone):
 
-**Performance on M4 Max:**
-- **Transcription**: ~500ms for 11s audio (21.8x real-time)
-- **Translation**: ~1.5s for typical sentences
-- **TTS**: ~200ms (macOS `say` placeholder)
-- **WebSocket round-trip**: 2.2s total latency ⚡
-
-**Next Steps:**
-1. Set up Tailscale and get your Mac's IP
-2. Create Telegram bot via @BotFather
-3. Configure and test!
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete setup guide.
-
-## Architecture
-
-```
-Current (Local Testing):
-[Audio File] → [Whisper STT] → [Qwen Translation] → [TTS] → [Audio Output]
-                    ↓                    ↓                ↓
-              Metal-accelerated    MLX-optimized    Placeholder (macOS say)
+```bash
+curl -fsSL https://raw.githubusercontent.com/mattwiebe/sandalphone/main/scripts/install-vps.sh | sudo bash
 ```
 
+Required env (pass as inline env vars to the command above):
+- `TAILSCALE_AUTHKEY` (Tailscale auth key with reuse enabled)
+
+The installer now shells into `node dist/cli.js install` and prompts you for
+`OUTBOUND_TARGET_E164` and all other settings interactively.
+
+If you do not have API keys yet, the installer prints a short guide with links to get them.
+
+Example:
+
+```bash
+OUTBOUND_TARGET_E164=+15555550100 \
+TAILSCALE_AUTHKEY=tskey-... \
+TWILIO_AUTH_TOKEN=... \
+GOOGLE_CLOUD_API_KEY=... \
+curl -fsSL https://raw.githubusercontent.com/mattwiebe/sandalphone/main/scripts/install-vps.sh | sudo bash
 ```
-Planned (Phase 2 - Cloud Integration):
-[iPhone] → [Telegram] → [Cloud VPS] → [Cloudflare Tunnel] → [Mac M4 Max]
-                                                                    ↓
-                                                        [Translation Pipeline]
+
+Notes:
+- The installer attempts `tailscale funnel --bg --yes 8080` and auto-detects the public URL.
+- If Funnel is not enabled for the tailnet, enable it at https://login.tailscale.com/f/funnel then re-run.
+- The systemd unit is installed as `sandalphone-vps-gateway`.
+
+## CLI
+Primary operator surface:
+
+```bash
+sandalphone help
 ```
 
-## Quick Start
+If `sandalphone` is not found after build:
 
-### Prerequisites
-- Mac with Apple Silicon (M1/M2/M3/M4)
-- Python 3.13+
-- Homebrew
-
-### Installation
-
-1. **Clone and setup:**
 ```bash
 cd /Users/matt/levi
-
-# Install uv (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install dependencies
-uv sync --extra mac
+npm link
 ```
 
-2. **Install system dependencies:**
+Equivalent local invocation (no global link needed):
+
 ```bash
-brew install cmake ffmpeg cloudflared direnv
+node dist/cli.js help
+node dist/cli.js install
+node dist/cli.js --version
 ```
 
-3. **Build Whisper.cpp with Metal:**
+Core commands:
+
 ```bash
-cd mac/models
-git clone https://github.com/ggml-org/whisper.cpp
-cd whisper.cpp
-mkdir build && cd build
-cmake .. -DGGML_METAL=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build . --config Release -j8
-cd .. && bash ./models/download-ggml-model.sh base
+sandalphone build
+sandalphone check
+sandalphone install
+sandalphone --version
+sandalphone funnel up --port 8080
+sandalphone funnel status
+sandalphone funnel reset --clear-env
+sandalphone test
+sandalphone test smoke
+sandalphone test quick
+sandalphone smoke live --base-url https://voice.yourdomain.com
+sandalphone session list
+sandalphone session set --session-id <id> --mode passthrough
+sandalphone session debug --session-id <id>
+sandalphone urls
+sandalphone openclaw command --command "start research project on vendor pricing"
+sandalphone doctor deploy
+sandalphone doctor local
+sandalphone doctor callpath
+sandalphone service print-unit
+sandalphone service print-launchd
+sandalphone service install-launchd
+sandalphone service launchd-load
+sandalphone service launchd-status
+sandalphone service launchd-logs --lines 200
+sandalphone service launchd-unload
+sandalphone service status
+sandalphone service logs --lines 200
 ```
 
-4. **Download ML models:**
+## Smoke Test
+With server running on port `8080`:
+
 ```bash
-# Already downloaded:
-# - Qwen2.5-7B-Instruct-4bit (mac/models/qwen-7b-4bit)
-# - Qwen3-TTS-0.6B-4bit (mac/models/qwen3-tts-0.6b)
+curl -sS http://localhost:8080/health
+curl -sS -X POST http://localhost:8080/twilio/voice \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  --data 'CallSid=CA123&From=%2B15551234567&To=%2B18005550199'
+curl -sS -X POST http://localhost:8080/asterisk/inbound \
+  -H 'content-type: application/json' \
+  -d '{"callId":"sip-1","from":"+15550000001","to":"+18005550199"}'
+curl -sS -X POST http://localhost:8080/asterisk/media \
+  -H 'content-type: application/json' \
+  -d '{"callId":"sip-1","sampleRateHz":8000,"encoding":"mulaw","payloadBase64":"AQI="}'
+curl -sS http://localhost:8080/sessions
 ```
 
-### Usage
+### Live Smoke Command
+Run against a running gateway (local or VPS):
 
-**Test the translation pipeline:**
 ```bash
-uv run --extra mac python mac/src/translation_service.py
+sandalphone smoke live --base-url http://127.0.0.1:8080
 ```
 
-This will:
-1. Transcribe the JFK sample audio (English)
-2. Translate to Spanish using Qwen
-3. Synthesize Spanish audio
-4. Play the result
+When Asterisk secret is enabled:
 
-**Use individual components:**
-
-```python
-from stt.whisper_client import WhisperClient
-from llm.translation_client import TranslationClient
-from tts.qwen_tts_client import QwenTTSClient
-
-# Transcribe audio
-stt = WhisperClient()
-text = stt.transcribe("audio.wav", language="es")
-
-# Translate
-translator = TranslationClient()
-translation = translator.translate(text, "es", "en")
-
-# Synthesize
-tts = QwenTTSClient()
-audio_file = tts.synthesize(translation, language="en")
+```bash
+sandalphone smoke live \
+  --base-url https://voice.yourdomain.com \
+  --secret your-secret
 ```
 
-## Project Structure
+Fail if egress has no chunk (`204`):
 
-```
-levi/
-├── mac/                          # Mac M4 backend
-│   ├── src/
-│   │   ├── stt/
-│   │   │   └── whisper_client.py    # Whisper.cpp wrapper
-│   │   ├── llm/
-│   │   │   └── translation_client.py # Qwen translation
-│   │   ├── tts/
-│   │   │   └── qwen_tts_client.py   # TTS client
-│   │   └── translation_service.py    # Main pipeline
-│   ├── models/
-│   │   ├── whisper.cpp/              # Whisper with Metal
-│   │   ├── qwen-7b-4bit/             # Translation LLM
-│   │   └── qwen3-tts-0.6b/           # TTS model
-│   └── config/
-├── cloud/                        # Cloud orchestrator (Phase 2)
-├── scripts/                      # Setup scripts
-├── shared/                       # Shared protocol definitions
-└── venv/                         # Python virtual environment
+```bash
+sandalphone smoke live --strict-egress
 ```
 
-## Roadmap
+### Tailscale Funnel Commands
+Manage local public ingress from CLI:
 
-### Phase 1: Local Translation Pipeline ✅ COMPLETE
-- [x] Set up Whisper.cpp with Metal
-- [x] Download and test Qwen translation model
-- [x] Download Qwen3-TTS model
-- [x] Create translation service pipeline
-- [x] Test end-to-end locally
+```bash
+sandalphone funnel up --port 8080
+sandalphone funnel status
+sandalphone funnel reset --clear-env
+```
 
-### Phase 2: Cloud Integration (Next 2 weeks)
-- [ ] Create FastAPI WebSocket server on Mac
-- [ ] Set up Cloudflare Tunnel
-- [ ] Provision Hetzner VPS ($4/month)
-- [ ] Create Telegram bot
-- [ ] Implement Pipecat voice pipeline
-- [ ] Test remote translation via Telegram
+`sandalphone funnel up` writes detected URL into `.env` as `PUBLIC_BASE_URL`.
+If auto-detection fails, run `tailscale funnel status`, copy the `https://...` host, and paste it into `PUBLIC_BASE_URL`.
 
-### Phase 3: Production (Week 4-5)
-- [ ] Add conversation state management
-- [ ] Implement audio archival (SQLite + M4A)
-- [ ] Add monitoring and health checks
-- [ ] Optimize latency (<3 seconds target)
-- [ ] Real-world testing with Spanish speakers
+## Current Endpoints
+- `GET /health`
+- `GET /sessions/:sessionId/debug`
+- `POST /sessions/control` (mode/language updates)
+- `POST /openclaw/command` (relay instructions to configured OpenClaw bridge)
+- `GET /sessions`
+- `GET /metrics`
+- `POST /twilio/voice` (form-encoded webhook)
+- `POST /asterisk/inbound` (JSON bridge payload)
+- `POST /asterisk/media` (JSON audio frame payload)
+- `POST /asterisk/end` (mark session ended and clear egress buffer)
+- `GET /asterisk/egress/next` (poll next translated audio chunk)
+- `WS /twilio/stream` (Twilio media stream)
 
-### Phase 4: Advanced Features (Future)
-- [ ] Voice commands for mode switching
-- [ ] MoltBot integration
-- [ ] Mac automation with MCP
-- [ ] Restaurant operations features
+## Deploy (VPS)
+1. Install Node.js 22+ on VPS.
+2. Clone repo and move into `/Users/matt/levi`.
+3. Create env file:
+   - Run `sandalphone install`
+   - Run `sandalphone doctor deploy`
+4. Install and enable systemd service:
+   - `sandalphone service print-unit`
+   - `sudo sandalphone service install-unit`
+   - `sudo sandalphone service reload`
+   - `sudo sandalphone service enable`
+   - `sudo sandalphone service restart`
+5. Verify:
+   - `sandalphone smoke live --base-url http://127.0.0.1:8080`
+6. Point providers to VPS:
+   - Twilio voice webhook -> `POST /twilio/voice`
+   - Twilio media stream websocket -> `WS /twilio/stream`
+   - Asterisk bridge -> `POST /asterisk/inbound` and `POST /asterisk/media`
 
-## Technology Stack
+### Deployment Templates
+- `deploy/systemd/sandalphone-vps-gateway.service` for non-container systemd deployments
+- `deploy/nginx/voice-gateway.conf` reverse-proxy baseline (includes WebSocket upgrade headers)
 
-- **STT**: Whisper.cpp (base model, Metal-accelerated)
-- **Translation**: Qwen2.5-7B-Instruct (MLX 4-bit quantized)
-- **TTS**: Qwen3-TTS 0.6B (placeholder: macOS `say`)
-- **LLM Runtime**: MLX + vllm-mlx
-- **Web Framework**: FastAPI + Uvicorn
-- **Cloud**: Hetzner VPS + Cloudflare Tunnel
-- **Messaging**: Telegram Bot API
+## Runtime Notes
+- This scaffold is stateless in-memory; restart loses active sessions.
+- `SIGINT` and `SIGTERM` are handled for clean service shutdown.
+- Missing Google Cloud API key degrades to stub providers.
+- For local E2E testing without cloud keys, set `STUB_STT_TEXT`.
+- If `TWILIO_AUTH_TOKEN` is set, `/twilio/voice` enforces `X-Twilio-Signature`.
 
-## Cost Breakdown
+## Integration Contracts
+### Asterisk Inbound Contract
+`POST /asterisk/inbound`
 
-**Current (Local Only):** $0/month
-**Phase 2 (Cloud Integration):**
-- Hetzner VPS: $4.09/month
-- Cloudflare Tunnel: $0 (free)
-- Telegram Bot: $0 (free)
-- **Total: ~$4-5/month** (well under $20 budget!)
+```json
+{
+  "callId": "sip-123",
+  "from": "+15550000001",
+  "to": "+18005550199"
+}
+```
 
-## Performance Metrics
+Response:
 
-### M4 Max Benchmarks
-- **Whisper base**: 504ms for 11s audio (21.8x real-time)
-- **Qwen 7B translation**: ~2-3s per sentence
-- **Metal acceleration**: Working perfectly
-- **Memory usage**: ~8GB for full pipeline
+```json
+{
+  "sessionId": "uuid",
+  "dialTarget": "+15555550100"
+}
+```
 
-### Target Latency Goals
-- Phase 1 (local): 3-5 seconds ✓
-- Phase 2 (cloud): <4 seconds
-- Phase 3 (optimized): <3 seconds
+### Asterisk Media Contract
+`POST /asterisk/media`
 
-## Development Notes
+```json
+{
+  "callId": "sip-123",
+  "sampleRateHz": 8000,
+  "encoding": "mulaw",
+  "payloadBase64": "AQI=",
+  "timestampMs": 1736337000000
+}
+```
 
-### Lessons Learned
-1. **Whisper.cpp Metal build**: Use CMake, not Makefile, for proper Metal support
-2. **MLX models**: Download from `mlx-community` for optimized quantized versions
-3. **Qwen prompting**: Use ChatML format (`<|im_start|>system...`) for best results
-4. **TTS**: Qwen3-TTS requires custom inference code (using macOS `say` as placeholder)
+Response:
 
-### Next Steps
-1. Implement proper Qwen3-TTS inference (replace macOS `say`)
-2. Create WebSocket server for remote access
-3. Set up Cloudflare Tunnel
-4. Build Telegram bot integration
+```json
+{
+  "accepted": true,
+  "sessionId": "uuid"
+}
+```
 
-## Contributing
+### Asterisk Egress Contract
+`GET /asterisk/egress/next?callId=sip-123&source=voipms`
 
-This is a personal project for restaurant operations in Puerto Vallarta, Mexico. The translation features are specifically tuned for Mexican Spanish.
+- Requires `x-asterisk-secret` when `ASTERISK_SHARED_SECRET` is configured.
+- Returns `204` when no translated audio is queued yet.
 
-## License
+Response (`200`):
 
-Private project - All rights reserved
+```json
+{
+  "sessionId": "uuid",
+  "encoding": "pcm_s16le",
+  "sampleRateHz": 16000,
+  "timestampMs": 1736337000100,
+  "payloadBase64": "AQI=",
+  "remainingQueue": 0
+}
+```
 
----
+### Asterisk End Contract
+`POST /asterisk/end`
 
-**Built with Claude Code** 🤖
-*Making Star Trek's Universal Translator a reality, one taco at a time.*
+```json
+{
+  "callId": "sip-123",
+  "source": "voipms"
+}
+```
+
+Alternative payload:
+
+```json
+{
+  "sessionId": "uuid"
+}
+```
+
+### Twilio Voice Contract
+`POST /twilio/voice` expects Twilio form fields including `CallSid`, `From`, and `To`.
+It returns TwiML that immediately dials the configured outbound target phone E.164.
+
+### Session Control Contract
+`POST /sessions/control`
+
+```json
+{
+  "sessionId": "uuid",
+  "mode": "passthrough"
+}
+```
+
+Alternative locator:
+
+```json
+{
+  "callId": "sip-123",
+  "source": "voipms",
+  "mode": "private_translation"
+}
+```
+
+### OpenClaw Command Contract
+`POST /openclaw/command`
+
+```json
+{
+  "command": "research supplier options for Guadalajara logistics",
+  "source": "twilio"
+}
+```
+
+## Env
+- `PORT` (default `8080`)
+- `OUTBOUND_TARGET_E164` (default `+15555550100`)
+- `DESTINATION_PHONE_E164` (legacy fallback only; migrate to `OUTBOUND_TARGET_E164`)
+- `TWILIO_PHONE_NUMBER` (optional metadata for your Twilio DID)
+- `VOIPMS_DID` (optional metadata for your VoIP.ms DID)
+- `LOG_LEVEL` (default `info`)
+- `ASTERISK_SHARED_SECRET` (recommended on public VPS; required as `x-asterisk-secret` header for `/asterisk/inbound` and `/asterisk/media` when set)
+- `CONTROL_API_SECRET` (recommended; required as `x-control-secret` header for `/sessions/control` and `/openclaw/command` when set)
+- `PIPELINE_MIN_FRAME_INTERVAL_MS` (default `400`; throttles STT calls per session to control API churn)
+- `EGRESS_MAX_QUEUE_PER_SESSION` (default `64`; bounds queued translated chunks per call)
+- `GOOGLE_CLOUD_API_KEY` (enables Google Cloud STT + Translate + TTS)
+- `GOOGLE_TTS_VOICE_EN` (default `en-US-Standard-C`)
+- `GOOGLE_TTS_VOICE_ES` (default `es-US-Standard-A`)
+- `STUB_STT_TEXT` (optional text emitted by stub STT provider for local e2e validation)
+- `TWILIO_AUTH_TOKEN` (optional; enables Twilio signature validation)
+- `PUBLIC_BASE_URL` (optional override for signature URL, e.g. `https://voice.yourdomain.com`)
+- `OPENCLAW_BRIDGE_URL` (optional HTTP endpoint for call/session events and command relay)
+- `OPENCLAW_BRIDGE_API_KEY` (optional bearer token for bridge endpoint)
+- `OPENCLAW_BRIDGE_TIMEOUT_MS` (default `1200`)
+To write to a non-default env file:
+
+```bash
+sandalphone install --env-path /path/to/.env
+```
+
+## macOS Background Service (launchd)
+Run as a user agent on macOS without Docker:
+
+```bash
+sandalphone service install-launchd
+sandalphone service launchd-load
+sandalphone service launchd-status
+sandalphone service launchd-logs --lines 200
+```
+
+Defaults:
+- Label: `com.sandalphone.vps-gateway`
+- Plist path: `~/Library/LaunchAgents/com.sandalphone.vps-gateway.plist`
+- Logs: `/tmp/sandalphone-vps-gateway.out.log`, `/tmp/sandalphone-vps-gateway.err.log`
+
+Override example:
+
+```bash
+sandalphone service install-launchd \
+  --label com.sandalphone.gateway.dev \
+  --env-path .env \
+  --stdout-log /tmp/sandalphone-dev.out.log \
+  --stderr-log /tmp/sandalphone-dev.err.log
+```
+
+## Local Readiness Check
+Before live call tests on macOS:
+
+```bash
+sandalphone doctor local
+```
+
+Checks:
+- `.env` presence and required target phone format
+- `PUBLIC_BASE_URL` HTTPS validity
+- Tailscale CLI/funnel status visibility
+
+## Callpath Doctor
+Quickly inspect a live/recent call and quality metrics:
+
+```bash
+sandalphone doctor callpath
+sandalphone doctor callpath --session-id <session-id>
+```
+
+Includes:
+- mode/language state
+- latency snapshot (STT/MT/TTS/pipeline)
+- dropped frame and passthrough counters
+- egress queue peak + drop count
+
+## Twilio URL Output
+Print exact URLs to paste in Twilio console:
+
+```bash
+sandalphone urls
+# or override explicitly
+sandalphone urls --base-url https://your-funnel-host.ts.net
+```
+
+## OpenClaw Command Relay
+If `OPENCLAW_BRIDGE_URL` is configured:
+
+```bash
+sandalphone openclaw command --command "queue research task for bilingual vendor shortlist"
+```
+
+Optional targeting:
+
+```bash
+sandalphone openclaw command \
+  --command "summarize current call and propose next questions" \
+  --session-id <session-id> \
+  --source twilio
+```

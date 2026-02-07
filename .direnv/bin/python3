@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+echo "⚠️  Intercepted 'python3' - using 'uv run python' instead" >&2
+exec uv run python "$@"
