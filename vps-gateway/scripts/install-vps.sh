@@ -91,11 +91,30 @@ ensure_tailscale() {
   if ! command -v tailscale >/dev/null 2>&1; then
     curl -fsSL https://tailscale.com/install.sh | sh
   fi
+  if [[ -z "${TAILSCALE_AUTHKEY}" ]]; then
+    if [[ -t 0 ]] || [[ -t 1 && -e /dev/tty ]]; then
+      log "TAILSCALE_AUTHKEY not set"
+      log "Create one at https://login.tailscale.com/admin/settings/keys"
+      if [[ -t 0 ]]; then
+        read -r -p "Use an auth key to log in now? [Y/n]: " reply
+      else
+        read -r -p "Use an auth key to log in now? [Y/n]: " reply </dev/tty
+      fi
+      reply="${reply:-Y}"
+      if [[ "${reply}" =~ ^[Yy]$ ]]; then
+        if [[ -t 0 ]]; then
+          read -r -p "TAILSCALE_AUTHKEY: " TAILSCALE_AUTHKEY
+        else
+          read -r -p "TAILSCALE_AUTHKEY: " TAILSCALE_AUTHKEY </dev/tty
+        fi
+      fi
+    else
+      log "TAILSCALE_AUTHKEY not set; skipping tailscale up"
+    fi
+  fi
   if [[ -n "${TAILSCALE_AUTHKEY}" ]]; then
     log "bringing up tailscale"
     tailscale up --authkey "${TAILSCALE_AUTHKEY}" --hostname "${TAILSCALE_HOSTNAME}" --ssh || true
-  else
-    log "TAILSCALE_AUTHKEY not set; skipping tailscale up"
   fi
   local status
   status="$(tailscale status 2>/dev/null || true)"
