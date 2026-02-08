@@ -349,10 +349,12 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
     }
 
     const base = publicBaseUrl || "https://<your-public-funnel-domain>";
-    process.stdout.write(`  ${step}. Configure Twilio:\n`);
-    process.stdout.write(`     - Voice webhook: ${base}/twilio/voice\n`);
-    process.stdout.write(`     - Media stream WS: wss://${stripScheme(base)}/twilio/stream\n`);
-    step += 1;
+    if (updates.TWILIO_PHONE_NUMBER) {
+      process.stdout.write(`  ${step}. Configure Twilio:\n`);
+      process.stdout.write(`     - Voice webhook: ${base}/twilio/voice\n`);
+      process.stdout.write(`     - Media stream WS: wss://${stripScheme(base)}/twilio/stream\n`);
+      step += 1;
+    }
     process.stdout.write(`  ${step}. Start service locally and run smoke:\n`);
     process.stdout.write("     - node dist/index.js\n");
     process.stdout.write(`     - sandalphone smoke live --base-url ${base}\n`);
@@ -374,18 +376,22 @@ function handleFunnel(args: string[], context: CliContext): void {
     const port = flags.port ?? "8080";
     const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
 
-    const url = setupFunnelAndPersistEnv(context, port, envPath, {
-      bg: flags.bg !== "0" && flags.bg !== "false",
-      yes: flags.yes !== "0" && flags.yes !== "false",
-    });
+  const url = setupFunnelAndPersistEnv(context, port, envPath, {
+    bg: flags.bg !== "0" && flags.bg !== "false",
+    yes: flags.yes !== "0" && flags.yes !== "false",
+  });
 
     if (!url) {
       die("funnel configured but could not detect public URL; run `sandalphone funnel status` and set PUBLIC_BASE_URL manually");
     }
 
     process.stdout.write(`[sandalphone] PUBLIC_BASE_URL updated to ${url} in ${envPath}\n`);
-    process.stdout.write(`[sandalphone] Twilio voice webhook: ${url}/twilio/voice\n`);
-    process.stdout.write(`[sandalphone] Twilio media stream: wss://${stripScheme(url)}/twilio/stream\n`);
+    const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+    const env = parseEnvFile(envText);
+    if (env.TWILIO_PHONE_NUMBER) {
+      process.stdout.write(`[sandalphone] Twilio voice webhook: ${url}/twilio/voice\n`);
+      process.stdout.write(`[sandalphone] Twilio media stream: wss://${stripScheme(url)}/twilio/stream\n`);
+    }
     return;
   }
 
@@ -719,8 +725,14 @@ function handleUrls(args: string[], context: CliContext): void {
   }
 
   process.stdout.write(`[sandalphone] base url: ${baseUrl}\n`);
-  process.stdout.write(`[sandalphone] Twilio Voice webhook: ${baseUrl}/twilio/voice\n`);
-  process.stdout.write(`[sandalphone] Twilio Media Stream WS: wss://${stripScheme(baseUrl)}/twilio/stream\n`);
+  const showTwilio =
+    Boolean(env.TWILIO_PHONE_NUMBER) ||
+    flags.twilio === "1" ||
+    flags.twilio === "true";
+  if (showTwilio) {
+    process.stdout.write(`[sandalphone] Twilio Voice webhook: ${baseUrl}/twilio/voice\n`);
+    process.stdout.write(`[sandalphone] Twilio Media Stream WS: wss://${stripScheme(baseUrl)}/twilio/stream\n`);
+  }
 }
 
 async function handleOpenClaw(args: string[], context: CliContext): Promise<void> {
