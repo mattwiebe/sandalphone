@@ -36,6 +36,9 @@ if (!outboundTarget) {
 if (process.env.TWILIO_AUTH_TOKEN && !process.env.PUBLIC_BASE_URL) {
   warnings.push("PUBLIC_BASE_URL is recommended when TWILIO_AUTH_TOKEN is set");
 }
+if (process.env.TWILIO_PHONE_NUMBER && !process.env.TWILIO_ACCOUNT_SID) {
+  warnings.push("TWILIO_ACCOUNT_SID is not set; `sandalphone smoke outbound` cannot place test calls");
+}
 
 if (!process.env.ASTERISK_SHARED_SECRET) {
   warnings.push("ASTERISK_SHARED_SECRET is not set; Asterisk ingress endpoints are unauthenticated");

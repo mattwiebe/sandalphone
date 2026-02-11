@@ -21,6 +21,19 @@ export function buildTwimlForBridge(outboundTargetE164: string): string {
   ].join("\n");
 }
 
+export function buildTwimlSayAndHangup(lines: Array<{ text: string; language: "en-US" | "es-MX" }>): string {
+  const sayLines = lines
+    .filter((line) => line.text.trim().length > 0)
+    .map((line) => `  <Say language="${line.language}">${escapeXml(line.text)}</Say>`);
+  return [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+    "<Response>",
+    ...sayLines,
+    "  <Hangup/>",
+    "</Response>",
+  ].join("\n");
+}
+
 export function handleTwilioInbound(
   orchestrator: VoiceOrchestrator,
   body: Record<string, string>,
@@ -31,4 +44,13 @@ export function handleTwilioInbound(
     twiml: buildTwimlForBridge(session.targetPhoneE164),
     sessionId: session.id,
   };
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&apos;");
 }

@@ -154,6 +154,37 @@ test("smoke: health + twilio voice endpoint", async () => {
   }
 });
 
+test("smoke: inbound test mode intercepts twilio call and hangs up", async () => {
+  const app = await startSmokeApp();
+  try {
+    const enable = await fetch(`${app.baseUrl}/test/inbound-mode`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-control-secret": "controlsecret",
+      },
+      body: JSON.stringify({
+        enabled: true,
+        message: "Inbound leg test message",
+      }),
+    });
+    assert.equal(enable.status, 200);
+
+    const twilio = await fetch(`${app.baseUrl}/twilio/voice`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "CallSid=CA_INBOUND_TEST&From=%2B15551234567&To=%2B18005550199",
+    });
+    assert.equal(twilio.status, 200);
+    const twiml = await twilio.text();
+    assert.equal(twiml.includes("<Say"), true);
+    assert.equal(twiml.includes("<Hangup"), true);
+    assert.equal(twiml.includes("<Dial"), false);
+  } finally {
+    await app.stop();
+  }
+});
+
 test("smoke: asterisk inbound/media/egress/end lifecycle", async () => {
   const app = await startSmokeApp();
   try {

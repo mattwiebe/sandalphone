@@ -148,6 +148,7 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       PUBLIC_BASE_URL: currentValues.PUBLIC_BASE_URL ?? "",
       OUTBOUND_TARGET_E164:
         currentValues.OUTBOUND_TARGET_E164 ?? "+15555550100",
+      TWILIO_ACCOUNT_SID: currentValues.TWILIO_ACCOUNT_SID ?? "",
       TWILIO_PHONE_NUMBER: currentValues.TWILIO_PHONE_NUMBER ?? "",
       VOIPMS_DID: currentValues.VOIPMS_DID ?? "",
       ASTERISK_SHARED_SECRET:
@@ -255,6 +256,14 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       secret: true,
       required: true,
     });
+    await promptAndPersist(
+      "TWILIO_ACCOUNT_SID",
+      "Twilio account SID" +
+        ((updates.TWILIO_PHONE_NUMBER ?? "").trim().length > 0 ? " (required for outbound smoke)" : " (optional)"),
+      {
+        defaultValue: defaults.TWILIO_ACCOUNT_SID,
+      },
+    );
     await promptAndPersist(
       "TWILIO_AUTH_TOKEN",
       "Twilio auth token" +
@@ -668,20 +677,42 @@ function handleTest(args: string[], context: CliContext): void {
 
 function handleSmoke(args: string[], context: CliContext): void {
   const mode = args[0] ?? "live";
-  if (mode !== "live") {
-    die(`unknown smoke mode: ${mode}`);
-  }
-
   const { flags } = parseFlags(args.slice(1));
-  const env: Dict = {};
-
-  if (flags["base-url"]) env.BASE_URL = flags["base-url"];
-  if (flags.secret) env.ASTERISK_SHARED_SECRET = flags.secret;
-  if (flags["strict-egress"] === "1" || flags["strict-egress"] === "true") {
-    env.STRICT_EGRESS = "1";
+  if (mode === "live") {
+    const env: Dict = {};
+    if (flags["base-url"]) env.BASE_URL = flags["base-url"];
+    if (flags.secret) env.ASTERISK_SHARED_SECRET = flags.secret;
+    if (flags["strict-egress"] === "1" || flags["strict-egress"] === "true") {
+      env.STRICT_EGRESS = "1";
+    }
+    runNodeScript("scripts/smoke-live.mjs", context, env);
+    return;
   }
 
-  runNodeScript("scripts/smoke-live.mjs", context, env);
+  if (mode === "inbound") {
+    const env: Dict = {};
+    if (flags["base-url"]) env.BASE_URL = flags["base-url"];
+    if (flags.secret) env.CONTROL_API_SECRET = flags.secret;
+    if (flags.enable === "1" || flags.enable === "true") env.SMOKE_INBOUND_MODE = "enable";
+    if (flags.disable === "1" || flags.disable === "true") env.SMOKE_INBOUND_MODE = "disable";
+    if (flags.status === "1" || flags.status === "true") env.SMOKE_INBOUND_MODE = "status";
+    if (!env.SMOKE_INBOUND_MODE) env.SMOKE_INBOUND_MODE = "status";
+    if (flags.message) env.SMOKE_INBOUND_MESSAGE = flags.message;
+    runNodeScript("scripts/smoke-inbound.mjs", context, env);
+    return;
+  }
+
+  if (mode === "outbound") {
+    const env: Dict = {};
+    if (flags.to) env.SMOKE_OUTBOUND_TO = flags.to;
+    if (flags.from) env.SMOKE_OUTBOUND_FROM = flags.from;
+    if (flags.message) env.SMOKE_OUTBOUND_TEXT_EN = flags.message;
+    if (flags["target-language"]) env.SMOKE_OUTBOUND_TARGET_LANGUAGE = flags["target-language"];
+    runNodeScript("scripts/smoke-outbound.mjs", context, env);
+    return;
+  }
+
+  die(`unknown smoke mode: ${mode}`);
 }
 
 function handleDoctor(args: string[], context: CliContext): void {
@@ -1218,7 +1249,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone install [--env-path PATH]\n`);
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
-  process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
+  process.stdout.write(`  sandalphone smoke <live|inbound|outbound>\n`);
   process.stdout.write(`  sandalphone urls [--env-path .env] [--base-url https://...]\n`);
   process.stdout.write(`  sandalphone openclaw command --command \"...\" [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session <list|set|debug>\n`);
@@ -1229,6 +1260,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone service <action>\n\n`);
   process.stdout.write(`Legacy alias: levi <command>\n\n`);
   printFunnelHelp();
+  printSmokeHelp();
   printSessionHelp();
   printServiceHelp();
 }
@@ -1238,6 +1270,16 @@ function printFunnelHelp(): void {
   process.stdout.write(`  sandalphone funnel up [--port 8080] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone funnel status\n`);
   process.stdout.write(`  sandalphone funnel reset [--clear-env] [--env-path .env]\n`);
+  process.stdout.write(`\n`);
+}
+
+function printSmokeHelp(): void {
+  process.stdout.write(`Smoke actions:\n`);
+  process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
+  process.stdout.write(`  sandalphone smoke inbound --status [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone smoke inbound --enable [--message "text"] [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone smoke inbound --disable [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone smoke outbound [--to E164] [--from E164] [--message "text"]\n`);
   process.stdout.write(`\n`);
 }
 

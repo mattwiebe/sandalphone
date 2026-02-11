@@ -92,6 +92,10 @@ sandalphone test
 sandalphone test smoke
 sandalphone test quick
 sandalphone smoke live --base-url https://voice.yourdomain.com
+sandalphone smoke inbound --enable --message "Inbound test mode. Speaking and hanging up."
+sandalphone smoke inbound --status
+sandalphone smoke inbound --disable
+sandalphone smoke outbound --to +15551234567
 sandalphone session list
 sandalphone session set --session-id <id> --mode passthrough
 sandalphone session debug --session-id <id>
@@ -149,6 +153,23 @@ Fail if egress has no chunk (`204`):
 sandalphone smoke live --strict-egress
 ```
 
+### Inbound Leg-Only Test Mode
+Enable inbound-only behavior for Twilio webhook: receive call, speak a test string, hang up, no forwarding.
+
+```bash
+sandalphone smoke inbound --enable --message "Inbound test mode active."
+# place a real call to your Twilio DID
+sandalphone smoke inbound --status
+sandalphone smoke inbound --disable
+```
+
+### Outbound Leg-Only Test
+Place a Twilio outbound call from your DID to your target and play English + Spanish prompt.
+
+```bash
+sandalphone smoke outbound --to +15551234567
+```
+
 ### Tailscale Funnel Commands
 Manage local public ingress from CLI:
 
@@ -166,6 +187,8 @@ If auto-detection fails, run `tailscale funnel status`, copy the `https://...` h
 - `GET /sessions/:sessionId/debug`
 - `POST /sessions/control` (mode/language updates)
 - `POST /openclaw/command` (relay instructions to configured OpenClaw bridge)
+- `GET /test/inbound-mode` (show inbound test mode)
+- `POST /test/inbound-mode` (enable/disable inbound test mode)
 - `GET /sessions`
 - `GET /metrics`
 - `POST /twilio/voice` (form-encoded webhook)
@@ -288,6 +311,7 @@ Alternative payload:
 ### Twilio Voice Contract
 `POST /twilio/voice` expects Twilio form fields including `CallSid`, `From`, and `To`.
 It returns TwiML that immediately dials the configured outbound target phone E.164.
+When inbound test mode is enabled, it instead returns TwiML `<Say>` + `<Hangup/>` and does not forward.
 
 ### Session Control Contract
 `POST /sessions/control`
@@ -322,6 +346,7 @@ Alternative locator:
 ## Env
 - `PORT` (default `8080`)
 - `OUTBOUND_TARGET_E164` (default `+15555550100`)
+- `TWILIO_ACCOUNT_SID` (required for `sandalphone smoke outbound`)
 - `TWILIO_PHONE_NUMBER` (optional metadata for your Twilio DID)
 - `VOIPMS_DID` (optional metadata for your VoIP.ms DID)
 - `LOG_LEVEL` (default `info`)

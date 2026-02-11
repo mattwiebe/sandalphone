@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import type { VoiceOrchestrator } from "../pipeline/orchestrator.js";
-import { handleTwilioInbound } from "../ingress/twilio.js";
+import { buildTwimlSayAndHangup, handleTwilioInbound } from "../ingress/twilio.js";
 import {
   handleAsteriskInbound,
   mapAsteriskMediaToFrame,
@@ -62,6 +62,13 @@ export function startHttpServer(
   },
 ): Server {
   const twilioWs = new WebSocketServer({ noServer: true });
+  const inboundTestMode: {
+    enabled: boolean;
+    message: string;
+  } = {
+    enabled: false,
+    message: "Hello. Inbound test mode is active. This verifies inbound call handling.",
+  };
 
   twilioWs.on("connection", (ws) => {
     wireTwilioMediaSocket(ws, orchestrator, logger);
@@ -145,10 +152,53 @@ export function startHttpServer(
         return writeJson(res, 202, { accepted: true });
       }
 
+      if (method === "GET" && pathname === "/test/inbound-mode") {
+        if (!hasValidControlSecret(req, opts.controlApiSecret)) {
+          return writeJson(res, 403, { error: "forbidden" });
+        }
+        return writeJson(res, 200, { inboundTestMode });
+      }
+
+      if (method === "POST" && pathname === "/test/inbound-mode") {
+        if (!hasValidControlSecret(req, opts.controlApiSecret)) {
+          return writeJson(res, 403, { error: "forbidden" });
+        }
+        const payload = await readJsonBody(req);
+        if (!validateInboundTestModePayload(payload)) {
+          return writeJson(res, 400, { error: "invalid_payload" });
+        }
+        inboundTestMode.enabled = payload.enabled;
+        if (payload.message !== undefined) {
+          inboundTestMode.message = payload.message;
+        }
+        logger.info("inbound test mode updated", {
+          enabled: inboundTestMode.enabled,
+          message: inboundTestMode.message,
+        });
+        return writeJson(res, 200, { inboundTestMode });
+      }
+
       if (method === "POST" && pathname === "/twilio/voice") {
         const body = await readFormBody(req);
         if (!hasValidTwilioSignature(req, body, opts.twilioAuthToken, opts.publicBaseUrl)) {
           return writeJson(res, 403, { error: "forbidden" });
+        }
+        if (inboundTestMode.enabled) {
+          logger.info("twilio inbound received in inbound-test mode", {
+            from: body.From ?? "unknown",
+            to: body.To ?? "unknown",
+          });
+          res.statusCode = 200;
+          res.setHeader("content-type", "application/xml");
+          res.end(
+            buildTwimlSayAndHangup([
+              {
+                text: inboundTestMode.message,
+                language: "en-US",
+              },
+            ]),
+          );
+          return;
         }
         const result = handleTwilioInbound(orchestrator, body);
         res.statusCode = 200;
@@ -279,6 +329,11 @@ type OpenClawCommandPayload = {
   source?: IngressSource;
 };
 
+type InboundTestModePayload = {
+  enabled: boolean;
+  message?: string;
+};
+
 function validateSessionControlPayload(payload: unknown): payload is SessionControlPayload {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
@@ -301,4 +356,12 @@ function validateOpenClawCommandPayload(payload: unknown): payload is OpenClawCo
   const p = payload as Record<string, unknown>;
   const sourceOk = p.source === undefined || p.source === "voipms" || p.source === "twilio";
   return typeof p.command === "string" && p.command.trim().length > 0 && sourceOk;
+}
+
+function validateInboundTestModePayload(payload: unknown): payload is InboundTestModePayload {
+  if (!payload || typeof payload !== "object") return false;
+  const p = payload as Record<string, unknown>;
+  if (typeof p.enabled !== "boolean") return false;
+  if (p.message !== undefined && typeof p.message !== "string") return false;
+  return true;
 }
