@@ -8,6 +8,8 @@ function log(step, detail) {
   process.stdout.write(`[smoke-outbound] ${step}${detail ? ` ${detail}` : ""}\n`);
 }
 
+let cachedEnvMap;
+
 function requireValue(name, value) {
   if (!value || value.trim().length === 0) {
     throw new Error(`${name} is required`);
@@ -145,7 +147,6 @@ function resolveValue(key, fallback = "") {
   return fallback;
 }
 
-let cachedEnvMap;
 function loadEnvMap() {
   if (cachedEnvMap !== undefined) return cachedEnvMap;
   const envPath = resolve(process.env.ENV_PATH ?? ".env");
