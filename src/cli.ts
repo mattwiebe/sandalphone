@@ -704,7 +704,10 @@ function handleSmoke(args: string[], context: CliContext): void {
 
   if (mode === "outbound") {
     const env: Dict = {};
-    if (flags.to) env.SMOKE_OUTBOUND_TO = flags.to;
+    const resolvedTo = resolveOutboundTargetForSmoke(context, flags);
+    if (resolvedTo) {
+      env.SMOKE_OUTBOUND_TO = resolvedTo;
+    }
     if (flags.from) env.SMOKE_OUTBOUND_FROM = flags.from;
     if (flags.message) env.SMOKE_OUTBOUND_TEXT_EN = flags.message;
     if (flags["target-language"]) env.SMOKE_OUTBOUND_TARGET_LANGUAGE = flags["target-language"];
@@ -921,6 +924,24 @@ function resolveControlSecret(context: CliContext, flags: Record<string, string>
   const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
   const env = parseEnvFile(envText);
   return env.CONTROL_API_SECRET ?? "";
+}
+
+function resolveOutboundTargetForSmoke(
+  context: CliContext,
+  flags: Record<string, string>,
+): string | undefined {
+  if (flags.to && flags.to.trim().length > 0) {
+    return flags.to.trim();
+  }
+
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const env = parseEnvFile(envText);
+  const configured = env.OUTBOUND_TARGET_E164?.trim();
+  if (configured) {
+    return configured;
+  }
+  return undefined;
 }
 
 function handleService(args: string[], context: CliContext): void {

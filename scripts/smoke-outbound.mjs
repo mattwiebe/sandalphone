@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
+import { createInterface } from "node:readline/promises";
+
 const accountSid = process.env.TWILIO_ACCOUNT_SID ?? "";
 const authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
 const from = process.env.SMOKE_OUTBOUND_FROM ?? process.env.TWILIO_PHONE_NUMBER ?? "";
-const to = process.env.SMOKE_OUTBOUND_TO ?? process.env.OUTBOUND_TARGET_E164 ?? "";
+let to = process.env.SMOKE_OUTBOUND_TO ?? process.env.OUTBOUND_TARGET_E164 ?? "";
 const textEn =
   process.env.SMOKE_OUTBOUND_TEXT_EN ??
   "Hello. This is the outbound leg smoke test. English leg sounds good.";
@@ -55,6 +57,9 @@ async function run() {
   requireValue("TWILIO_ACCOUNT_SID", accountSid);
   requireValue("TWILIO_AUTH_TOKEN", authToken);
   requireValue("SMOKE_OUTBOUND_FROM or TWILIO_PHONE_NUMBER", from);
+  if (!to || to.trim().length === 0) {
+    to = await promptForToIfMissing();
+  }
   requireValue("SMOKE_OUTBOUND_TO or OUTBOUND_TARGET_E164", to);
 
   log("to", to);
@@ -93,6 +98,24 @@ async function run() {
   }
   const payload = JSON.parse(body);
   log("queued", `callSid=${payload?.sid ?? "unknown"}`);
+}
+
+async function promptForToIfMissing() {
+  if (!process.stdin.isTTY) {
+    throw new Error("missing outbound destination: set OUTBOUND_TARGET_E164 or pass --to +E164");
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question(
+      "[smoke-outbound] outbound destination (E.164, e.g. +15555550100): ",
+    )).trim();
+    if (!/^\+[1-9]\d{7,14}$/.test(answer)) {
+      throw new Error("invalid destination; must be E.164 format like +15555550100");
+    }
+    return answer;
+  } finally {
+    rl.close();
+  }
 }
 
 function escapeXml(value) {

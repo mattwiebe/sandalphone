@@ -170,6 +170,8 @@ Place a Twilio outbound call from your DID to your target and play English + Spa
 sandalphone smoke outbound --to +15551234567
 ```
 
+If `--to` is omitted, it uses `OUTBOUND_TARGET_E164`. If that is missing, CLI prompts for destination interactively.
+
 ### Tailscale Funnel Commands
 Manage local public ingress from CLI:
 
