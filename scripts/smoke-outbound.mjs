@@ -1,16 +1,8 @@
 #!/usr/bin/env node
 
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
-
-const accountSid = process.env.TWILIO_ACCOUNT_SID ?? "";
-const authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
-const from = process.env.SMOKE_OUTBOUND_FROM ?? process.env.TWILIO_PHONE_NUMBER ?? "";
-let to = process.env.SMOKE_OUTBOUND_TO ?? process.env.OUTBOUND_TARGET_E164 ?? "";
-const textEn =
-  process.env.SMOKE_OUTBOUND_TEXT_EN ??
-  "Hello. This is the outbound leg smoke test. English leg sounds good.";
-const targetLanguage = process.env.SMOKE_OUTBOUND_TARGET_LANGUAGE ?? "es";
-const googleApiKey = process.env.GOOGLE_CLOUD_API_KEY ?? "";
 
 function log(step, detail) {
   process.stdout.write(`[smoke-outbound] ${step}${detail ? ` ${detail}` : ""}\n`);
@@ -23,7 +15,9 @@ function requireValue(name, value) {
 }
 
 async function maybeTranslateToSpanish(text) {
+  const targetLanguage = resolveValue("SMOKE_OUTBOUND_TARGET_LANGUAGE", "es");
   if (targetLanguage !== "es") return "";
+  const googleApiKey = resolveValue("GOOGLE_CLOUD_API_KEY");
   if (!googleApiKey) return "";
 
   const endpoint = `https://translation.googleapis.com/language/translate/v2?key=${encodeURIComponent(googleApiKey)}`;
@@ -54,6 +48,14 @@ function buildTwiml(lines) {
 }
 
 async function run() {
+  const accountSid = resolveValue("TWILIO_ACCOUNT_SID");
+  const authToken = resolveValue("TWILIO_AUTH_TOKEN");
+  const from = resolveValue("SMOKE_OUTBOUND_FROM") || resolveValue("TWILIO_PHONE_NUMBER");
+  let to = resolveValue("SMOKE_OUTBOUND_TO") || resolveValue("OUTBOUND_TARGET_E164");
+  const textEn =
+    resolveValue("SMOKE_OUTBOUND_TEXT_EN") ||
+    "Hello. This is the outbound leg smoke test. English leg sounds good.";
+
   requireValue("TWILIO_ACCOUNT_SID", accountSid);
   requireValue("TWILIO_AUTH_TOKEN", authToken);
   requireValue("SMOKE_OUTBOUND_FROM or TWILIO_PHONE_NUMBER", from);
@@ -133,3 +135,41 @@ run().catch((error) => {
   );
   process.exit(1);
 });
+
+function resolveValue(key, fallback = "") {
+  const fromProcess = process.env[key];
+  if (fromProcess && fromProcess.trim().length > 0) return fromProcess.trim();
+  const envMap = loadEnvMap();
+  const fromFile = envMap[key];
+  if (fromFile && fromFile.trim().length > 0) return fromFile.trim();
+  return fallback;
+}
+
+let cachedEnvMap;
+function loadEnvMap() {
+  if (cachedEnvMap !== undefined) return cachedEnvMap;
+  const envPath = resolve(process.env.ENV_PATH ?? ".env");
+  if (!existsSync(envPath)) {
+    cachedEnvMap = {};
+    return cachedEnvMap;
+  }
+  const out = {};
+  const text = readFileSync(envPath, "utf8");
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const idx = line.indexOf("=");
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    let value = line.slice(idx + 1).trim();
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    out[key] = value;
+  }
+  cachedEnvMap = out;
+  return cachedEnvMap;
+}
