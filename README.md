@@ -84,6 +84,7 @@ sandalphone build
 sandalphone check
 sandalphone update
 sandalphone update --test
+sandalphone update --no-restart
 sandalphone install
 sandalphone --version
 sandalphone funnel up --port 8080
@@ -172,6 +173,15 @@ sandalphone smoke outbound --to +15551234567
 ```
 
 If `--to` is omitted, it uses `OUTBOUND_TARGET_E164`. If that is missing, CLI prompts for destination interactively.
+
+### Update Workflow
+`sandalphone update` runs:
+- `git pull --ff-only`
+- dependency install (`npm ci` when lockfile exists)
+- `npm run build`
+- systemd restart on Linux when `sandalphone-vps-gateway.service` exists
+
+Use `--no-restart` to skip service restart.
 
 ### Tailscale Funnel Commands
 Manage local public ingress from CLI:

@@ -682,6 +682,7 @@ function handleTest(args: string[], context: CliContext): void {
 function handleUpdate(args: string[], context: CliContext): void {
   const { flags } = parseFlags(args);
   const runTests = flags.test === "1" || flags.test === "true";
+  const noRestart = flags["no-restart"] === "1" || flags["no-restart"] === "true";
   const installCmd = existsSync(resolve(context.projectRoot, "package-lock.json"))
     ? ["ci"]
     : ["install"];
@@ -695,12 +696,48 @@ function handleUpdate(args: string[], context: CliContext): void {
   process.stdout.write("[sandalphone] update: npm run build\n");
   runCommandChecked("npm", ["run", "build"], { cwd: context.projectRoot });
 
+  if (!noRestart) {
+    restartManagedService();
+  }
+
   if (runTests) {
     process.stdout.write("[sandalphone] update: npm test\n");
     runCommandChecked("npm", ["test"], { cwd: context.projectRoot });
   }
 
   process.stdout.write("[sandalphone] update complete\n");
+}
+
+function restartManagedService(): void {
+  if (platform() !== "linux") return;
+  if (!existsSync("/bin/systemctl") && !existsSync("/usr/bin/systemctl")) return;
+
+  const isPresent = runCommandCapture("systemctl", [
+    "list-unit-files",
+    "sandalphone-vps-gateway.service",
+    "--no-legend",
+    "--no-pager",
+  ]);
+  const combined = `${isPresent.stdout}\n${isPresent.stderr}`;
+  if (!combined.includes("sandalphone-vps-gateway.service")) {
+    return;
+  }
+
+  process.stdout.write("[sandalphone] update: restarting sandalphone-vps-gateway.service\n");
+  const restart = runCommandCapture("systemctl", [
+    "restart",
+    "sandalphone-vps-gateway.service",
+  ]);
+  if (restart.status !== 0) {
+    const details = `${restart.stdout}\n${restart.stderr}`.trim();
+    process.stderr.write("[sandalphone] WARN failed to restart service automatically\n");
+    if (details.length > 0) {
+      process.stderr.write(`${details}\n`);
+    }
+    process.stderr.write(
+      "[sandalphone] run: sudo systemctl restart sandalphone-vps-gateway.service\n",
+    );
+  }
 }
 
 function handleSmoke(args: string[], context: CliContext): void {
@@ -1314,7 +1351,7 @@ function printHelp(): void {
   process.stdout.write(`  If global command is missing: run scripts/install-vps.sh or create a wrapper in /usr/local/bin\n\n`);
   process.stdout.write(`Usage:\n`);
   process.stdout.write(`  sandalphone install [--env-path PATH]\n`);
-  process.stdout.write(`  sandalphone update [--test]\n`);
+  process.stdout.write(`  sandalphone update [--test] [--no-restart]\n`);
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
   process.stdout.write(`  sandalphone smoke <live|inbound|outbound>\n`);
