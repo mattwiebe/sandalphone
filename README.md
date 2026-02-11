@@ -82,6 +82,8 @@ Core commands:
 ```bash
 sandalphone build
 sandalphone check
+sandalphone update
+sandalphone update --test
 sandalphone install
 sandalphone --version
 sandalphone funnel up --port 8080

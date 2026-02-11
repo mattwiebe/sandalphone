@@ -68,6 +68,10 @@ async function main(argv: string[]): Promise<void> {
       runNpmScript(command, context);
       return;
     }
+    case "update": {
+      handleUpdate(rest, context);
+      return;
+    }
     case "install": {
       await handleInstall(rest, context);
       return;
@@ -675,6 +679,30 @@ function handleTest(args: string[], context: CliContext): void {
   die(`unknown test mode: ${mode}`);
 }
 
+function handleUpdate(args: string[], context: CliContext): void {
+  const { flags } = parseFlags(args);
+  const runTests = flags.test === "1" || flags.test === "true";
+  const installCmd = existsSync(resolve(context.projectRoot, "package-lock.json"))
+    ? ["ci"]
+    : ["install"];
+
+  process.stdout.write("[sandalphone] update: git pull --ff-only\n");
+  runCommandChecked("git", ["pull", "--ff-only"], { cwd: context.projectRoot });
+
+  process.stdout.write(`[sandalphone] update: npm ${installCmd.join(" ")}\n`);
+  runCommandChecked("npm", installCmd, { cwd: context.projectRoot });
+
+  process.stdout.write("[sandalphone] update: npm run build\n");
+  runCommandChecked("npm", ["run", "build"], { cwd: context.projectRoot });
+
+  if (runTests) {
+    process.stdout.write("[sandalphone] update: npm test\n");
+    runCommandChecked("npm", ["test"], { cwd: context.projectRoot });
+  }
+
+  process.stdout.write("[sandalphone] update complete\n");
+}
+
 function handleSmoke(args: string[], context: CliContext): void {
   const mode = args[0] ?? "live";
   const { flags } = parseFlags(args.slice(1));
@@ -1153,6 +1181,24 @@ function runCommand(
   }
 }
 
+function runCommandChecked(
+  command: string,
+  args: string[],
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+): void {
+  const result = spawnSync(command, args, {
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: "inherit",
+  });
+  if (result.error) {
+    die(`failed to run ${command}: ${result.error.message}`);
+  }
+  if ((result.status ?? 1) !== 0) {
+    die(`${command} ${args.join(" ")} failed with exit code ${result.status ?? 1}`);
+  }
+}
+
 function runCommandCapture(
   command: string,
   args: string[],
@@ -1268,6 +1314,7 @@ function printHelp(): void {
   process.stdout.write(`  If global command is missing: run scripts/install-vps.sh or create a wrapper in /usr/local/bin\n\n`);
   process.stdout.write(`Usage:\n`);
   process.stdout.write(`  sandalphone install [--env-path PATH]\n`);
+  process.stdout.write(`  sandalphone update [--test]\n`);
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
   process.stdout.write(`  sandalphone smoke <live|inbound|outbound>\n`);
