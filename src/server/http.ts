@@ -65,9 +65,18 @@ export function startHttpServer(
   const inboundTestMode: {
     enabled: boolean;
     message: string;
+    messageEs: string;
+    activeCallSid?: string;
+    lastEventId: number;
+    recentEvents: InboundTestEvent[];
+    completionTimer?: NodeJS.Timeout;
   } = {
     enabled: false,
     message: "Hello. Inbound test mode is active. This verifies inbound call handling.",
+    messageEs:
+      "Hola. El modo de prueba entrante esta activo. Esta llamada verifica la recepcion.",
+    lastEventId: 0,
+    recentEvents: [],
   };
 
   twilioWs.on("connection", (ws) => {
@@ -156,7 +165,22 @@ export function startHttpServer(
         if (!hasValidControlSecret(req, opts.controlApiSecret)) {
           return writeJson(res, 403, { error: "forbidden" });
         }
-        return writeJson(res, 200, { inboundTestMode });
+        const sinceEventIdRaw = url.searchParams.get("sinceEventId");
+        const sinceEventId = sinceEventIdRaw ? Number(sinceEventIdRaw) : undefined;
+        const recentEvents =
+          sinceEventId !== undefined && Number.isFinite(sinceEventId)
+            ? inboundTestMode.recentEvents.filter((event) => event.id > sinceEventId)
+            : inboundTestMode.recentEvents;
+        return writeJson(res, 200, {
+          inboundTestMode: {
+            enabled: inboundTestMode.enabled,
+            message: inboundTestMode.message,
+            messageEs: inboundTestMode.messageEs,
+            activeCallSid: inboundTestMode.activeCallSid,
+            lastEventId: inboundTestMode.lastEventId,
+            recentEvents,
+          },
+        });
       }
 
       if (method === "POST" && pathname === "/test/inbound-mode") {
@@ -168,12 +192,23 @@ export function startHttpServer(
           return writeJson(res, 400, { error: "invalid_payload" });
         }
         inboundTestMode.enabled = payload.enabled;
+        if (!payload.enabled) {
+          inboundTestMode.activeCallSid = undefined;
+          if (inboundTestMode.completionTimer) {
+            clearTimeout(inboundTestMode.completionTimer);
+            inboundTestMode.completionTimer = undefined;
+          }
+        }
         if (payload.message !== undefined) {
           inboundTestMode.message = payload.message;
+        }
+        if (payload.messageEs !== undefined) {
+          inboundTestMode.messageEs = payload.messageEs;
         }
         logger.info("inbound test mode updated", {
           enabled: inboundTestMode.enabled,
           message: inboundTestMode.message,
+          messageEs: inboundTestMode.messageEs,
         });
         return writeJson(res, 200, { inboundTestMode });
       }
@@ -191,10 +226,36 @@ export function startHttpServer(
           return writeJson(res, 403, { error: "forbidden" });
         }
         if (inboundTestMode.enabled) {
+          const callSid = body.CallSid ?? "unknown";
+          inboundTestMode.activeCallSid = callSid;
+          pushInboundTestEvent(inboundTestMode, {
+            type: "incoming",
+            callSid,
+            from: body.From ?? "unknown",
+            to: body.To ?? "unknown",
+            atMs: Date.now(),
+          });
           logger.info("twilio inbound received in inbound-test mode", {
             from: body.From ?? "unknown",
             to: body.To ?? "unknown",
+            callSid,
           });
+          if (inboundTestMode.completionTimer) {
+            clearTimeout(inboundTestMode.completionTimer);
+          }
+          const completionDelayMs = estimateInboundTestCompletionDelayMs(inboundTestMode.message);
+          inboundTestMode.completionTimer = setTimeout(() => {
+            if (!inboundTestMode.enabled) return;
+            inboundTestMode.activeCallSid = undefined;
+            pushInboundTestEvent(inboundTestMode, {
+              type: "completed",
+              callSid,
+              from: body.From ?? "unknown",
+              to: body.To ?? "unknown",
+              atMs: Date.now(),
+            });
+            inboundTestMode.completionTimer = undefined;
+          }, completionDelayMs);
           res.statusCode = 200;
           res.setHeader("content-type", "application/xml");
           res.end(
@@ -202,6 +263,10 @@ export function startHttpServer(
               {
                 text: inboundTestMode.message,
                 language: "en-US",
+              },
+              {
+                text: inboundTestMode.messageEs,
+                language: "es-MX",
               },
             ]),
           );
@@ -339,6 +404,16 @@ type OpenClawCommandPayload = {
 type InboundTestModePayload = {
   enabled: boolean;
   message?: string;
+  messageEs?: string;
+};
+
+type InboundTestEvent = {
+  id: number;
+  type: "incoming" | "completed";
+  callSid: string;
+  from: string;
+  to: string;
+  atMs: number;
 };
 
 function validateSessionControlPayload(payload: unknown): payload is SessionControlPayload {
@@ -370,5 +445,30 @@ function validateInboundTestModePayload(payload: unknown): payload is InboundTes
   const p = payload as Record<string, unknown>;
   if (typeof p.enabled !== "boolean") return false;
   if (p.message !== undefined && typeof p.message !== "string") return false;
+  if (p.messageEs !== undefined && typeof p.messageEs !== "string") return false;
   return true;
+}
+
+function pushInboundTestEvent(
+  state: {
+    lastEventId: number;
+    recentEvents: InboundTestEvent[];
+  },
+  event: Omit<InboundTestEvent, "id">,
+): void {
+  state.lastEventId += 1;
+  state.recentEvents.push({
+    id: state.lastEventId,
+    ...event,
+  });
+  if (state.recentEvents.length > 32) {
+    state.recentEvents = state.recentEvents.slice(-32);
+  }
+}
+
+function estimateInboundTestCompletionDelayMs(message: string): number {
+  // Coarse voice duration estimate so smoke mode can auto-exit after playback.
+  const chars = Math.max(message.trim().length, 1);
+  const speechMs = Math.ceil((chars / 13) * 1000);
+  return Math.max(2500, speechMs + 1500);
 }

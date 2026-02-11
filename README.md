@@ -156,7 +156,8 @@ sandalphone smoke live --strict-egress
 ```
 
 ### Inbound Leg-Only Test Mode
-Enable inbound-only behavior for Twilio webhook: receive call, speak a test string, hang up, no forwarding.
+Enable inbound-only behavior for Twilio webhook: receive call, speak English + Spanish test strings, hang up, no forwarding.
+`--enable` now stays attached, prints inbound events, waits for strict Twilio call completion, auto-disables test mode, then exits.
 
 ```bash
 sandalphone smoke inbound --enable --message "Inbound test mode active."
@@ -164,6 +165,11 @@ sandalphone smoke inbound --enable --message "Inbound test mode active."
 sandalphone smoke inbound --status
 sandalphone smoke inbound --disable
 ```
+
+Optional flags:
+- `--timeout 180000` max wait before auto-disable + exit failure
+- `--no-watch` restore old behavior (enable and exit immediately)
+- `--no-strict-completion` do not poll Twilio call status; rely on gateway completion event
 
 ### Outbound Leg-Only Test
 Place a Twilio outbound call from your DID to your target and play English + Spanish prompt.

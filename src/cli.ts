@@ -764,6 +764,13 @@ function handleSmoke(args: string[], context: CliContext): void {
     if (flags.status === "1" || flags.status === "true") env.SMOKE_INBOUND_MODE = "status";
     if (!env.SMOKE_INBOUND_MODE) env.SMOKE_INBOUND_MODE = "status";
     if (flags.message) env.SMOKE_INBOUND_MESSAGE = flags.message;
+    if (flags["no-watch"] === "1" || flags["no-watch"] === "true") {
+      env.SMOKE_INBOUND_WATCH = "0";
+    }
+    if (flags["no-strict-completion"] === "1" || flags["no-strict-completion"] === "true") {
+      env.SMOKE_INBOUND_STRICT_COMPLETION = "0";
+    }
+    if (flags.timeout) env.SMOKE_INBOUND_TIMEOUT_MS = flags.timeout;
     runNodeScript("scripts/smoke-inbound.mjs", context, env);
     return;
   }
@@ -1382,7 +1389,7 @@ function printSmokeHelp(): void {
   process.stdout.write(`Smoke actions:\n`);
   process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
   process.stdout.write(`  sandalphone smoke inbound --status [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
-  process.stdout.write(`  sandalphone smoke inbound --enable [--message "text"] [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone smoke inbound --enable [--message "text"] [--timeout MS] [--no-watch] [--no-strict-completion] [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone smoke inbound --disable [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone smoke outbound [--to E164] [--from E164] [--message "text"]\n`);
   process.stdout.write(`\n`);
