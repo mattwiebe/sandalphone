@@ -5,8 +5,7 @@
   "type": "module",
   "description": "TypeScript VPS voice gateway for Sandalphone",
   "bin": {
-    "sandalphone": "dist/cli.js",
-    "levi": "dist/cli.js"
+    "sandalphone": "dist/cli.js"
   },
   "engines": {
     "node": ">=22"

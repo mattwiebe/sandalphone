@@ -63,11 +63,10 @@ Primary operator surface:
 sandalphone help
 ```
 
-If `sandalphone` is not found after build:
+If `sandalphone` is not found after build, use the local form:
 
 ```bash
-cd /Users/matt/levi
-npm link
+node dist/cli.js <command>
 ```
 
 Equivalent local invocation (no global link needed):

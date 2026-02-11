@@ -1265,7 +1265,7 @@ function printHelp(): void {
   process.stdout.write(`Invocation:\n`);
   process.stdout.write(`  Global: sandalphone <command>\n`);
   process.stdout.write(`  Local:  node dist/cli.js <command>\n`);
-  process.stdout.write(`  If global command is missing: cd /Users/matt/levi && npm link\n\n`);
+  process.stdout.write(`  If global command is missing: run scripts/install-vps.sh or create a wrapper in /usr/local/bin\n\n`);
   process.stdout.write(`Usage:\n`);
   process.stdout.write(`  sandalphone install [--env-path PATH]\n`);
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
@@ -1279,7 +1279,6 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);
   process.stdout.write(`  sandalphone doctor callpath [--base-url URL] [--session-id ID] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone service <action>\n\n`);
-  process.stdout.write(`Legacy alias: levi <command>\n\n`);
   printFunnelHelp();
   printSmokeHelp();
   printSessionHelp();

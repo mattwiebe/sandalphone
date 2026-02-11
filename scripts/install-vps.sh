@@ -207,7 +207,11 @@ build_app() {
 
 install_cli_link() {
   log "installing cli"
-  ln -sf "${APP_DIR}/dist/cli.js" /usr/local/bin/sandalphone
+  cat >/usr/local/bin/sandalphone <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec node "${APP_DIR}/dist/cli.js" "\$@"
+EOF
   chmod +x /usr/local/bin/sandalphone
 }
 
