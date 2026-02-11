@@ -181,6 +181,13 @@ export function startHttpServer(
       if (method === "POST" && pathname === "/twilio/voice") {
         const body = await readFormBody(req);
         if (!hasValidTwilioSignature(req, body, opts.twilioAuthToken, opts.publicBaseUrl)) {
+          logger.warn("twilio signature rejected", {
+            callSid: body.CallSid ?? "unknown",
+            from: body.From ?? "unknown",
+            to: body.To ?? "unknown",
+            hasAuthToken: Boolean(opts.twilioAuthToken),
+            hasPublicBaseUrl: Boolean(opts.publicBaseUrl),
+          });
           return writeJson(res, 403, { error: "forbidden" });
         }
         if (inboundTestMode.enabled) {

@@ -757,7 +757,8 @@ function handleSmoke(args: string[], context: CliContext): void {
   if (mode === "inbound") {
     const env: Dict = {};
     if (flags["base-url"]) env.BASE_URL = flags["base-url"];
-    if (flags.secret) env.CONTROL_API_SECRET = flags.secret;
+    if (flags["env-path"]) env.ENV_PATH = resolve(context.projectRoot, flags["env-path"]);
+    env.CONTROL_API_SECRET = resolveControlSecret(context, flags);
     if (flags.enable === "1" || flags.enable === "true") env.SMOKE_INBOUND_MODE = "enable";
     if (flags.disable === "1" || flags.disable === "true") env.SMOKE_INBOUND_MODE = "disable";
     if (flags.status === "1" || flags.status === "true") env.SMOKE_INBOUND_MODE = "status";
@@ -1380,9 +1381,9 @@ function printFunnelHelp(): void {
 function printSmokeHelp(): void {
   process.stdout.write(`Smoke actions:\n`);
   process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
-  process.stdout.write(`  sandalphone smoke inbound --status [--base-url URL] [--secret SECRET]\n`);
-  process.stdout.write(`  sandalphone smoke inbound --enable [--message "text"] [--base-url URL] [--secret SECRET]\n`);
-  process.stdout.write(`  sandalphone smoke inbound --disable [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone smoke inbound --status [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone smoke inbound --enable [--message "text"] [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone smoke inbound --disable [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone smoke outbound [--to E164] [--from E164] [--message "text"]\n`);
   process.stdout.write(`\n`);
 }
