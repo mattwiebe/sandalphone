@@ -160,6 +160,8 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       CONTROL_API_SECRET:
         pickNonEmpty(currentValues.CONTROL_API_SECRET) ?? randomBytes(16).toString("hex"),
       TWILIO_AUTH_TOKEN: currentValues.TWILIO_AUTH_TOKEN ?? "",
+      TWILIO_VOICE_MODE: currentValues.TWILIO_VOICE_MODE ?? "dial",
+      TWILIO_STREAM_WS_URL: currentValues.TWILIO_STREAM_WS_URL ?? "",
       GOOGLE_CLOUD_API_KEY:
         currentValues.GOOGLE_CLOUD_API_KEY ??
         currentValues.GOOGLE_TTS_API_KEY ??
@@ -240,6 +242,31 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
     await promptAndPersist("PUBLIC_BASE_URL", "Public base URL (for Twilio signature checks)", {
       defaultValue: detectedPublicBaseUrl || defaults.PUBLIC_BASE_URL,
     });
+    await promptAndPersist("TWILIO_VOICE_MODE", "Twilio inbound voice mode (dial|stream)", {
+      defaultValue: defaults.TWILIO_VOICE_MODE,
+      required: true,
+      validate: (value) => {
+        const normalized = value.trim().toLowerCase();
+        if (normalized !== "dial" && normalized !== "stream") {
+          return "must be dial or stream";
+        }
+        return undefined;
+      },
+    });
+    await promptAndPersist(
+      "TWILIO_STREAM_WS_URL",
+      "Twilio stream WebSocket URL (optional override, wss://.../twilio/stream)",
+      {
+        defaultValue: defaults.TWILIO_STREAM_WS_URL,
+        validate: (value) => {
+          if (!value.trim()) return undefined;
+          if (!/^wss?:\/\//.test(value.trim())) {
+            return "must start with ws:// or wss://";
+          }
+          return undefined;
+        },
+      },
+    );
     await promptAndPersist("TWILIO_PHONE_NUMBER", "Twilio DID number (optional)", {
       defaultValue: defaults.TWILIO_PHONE_NUMBER,
     });
@@ -340,6 +367,20 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       }
     }
 
+    const twilioVoiceMode = (updates.TWILIO_VOICE_MODE ?? "dial").trim().toLowerCase();
+    const hasStreamUrl = (updates.TWILIO_STREAM_WS_URL ?? "").trim().length > 0;
+    const hasPublicBaseUrl = (updates.PUBLIC_BASE_URL ?? "").trim().length > 0;
+    if (twilioVoiceMode === "stream" && !hasStreamUrl && !hasPublicBaseUrl) {
+      const cont = await promptYesNo(
+        rl,
+        "TWILIO_VOICE_MODE=stream but no PUBLIC_BASE_URL/TWILIO_STREAM_WS_URL set. Continue anyway?",
+        false,
+      );
+      if (!cont) {
+        throw new Error("install canceled: configure PUBLIC_BASE_URL or TWILIO_STREAM_WS_URL");
+      }
+    }
+
     updateEnvFile(envPath, updates, context.projectRoot);
 
     const publicBaseUrl = updates.PUBLIC_BASE_URL;
@@ -363,9 +404,15 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
 
     const base = publicBaseUrl || "https://<your-public-funnel-domain>";
     if (updates.TWILIO_PHONE_NUMBER) {
+      const mode = (updates.TWILIO_VOICE_MODE ?? "dial").trim().toLowerCase();
       process.stdout.write(`  ${step}. Configure Twilio:\n`);
       process.stdout.write(`     - Voice webhook: ${base}/twilio/voice\n`);
-      process.stdout.write(`     - Media stream WS: wss://${stripScheme(base)}/twilio/stream\n`);
+      if (mode === "stream") {
+        const wsUrl =
+          (updates.TWILIO_STREAM_WS_URL ?? "").trim() ||
+          `wss://${stripScheme(base)}/twilio/stream`;
+        process.stdout.write(`     - Media stream WS: ${wsUrl}\n`);
+      }
       step += 1;
     }
     process.stdout.write(`  ${step}. Start service locally and run smoke:\n`);
@@ -747,6 +794,16 @@ function handleSmoke(args: string[], context: CliContext): void {
     const env: Dict = {};
     if (flags["base-url"]) env.BASE_URL = flags["base-url"];
     if (flags.secret) env.ASTERISK_SHARED_SECRET = flags.secret;
+    if (flags["env-path"]) {
+      const envPath = resolve(context.projectRoot, flags["env-path"]);
+      env.ENV_PATH = envPath;
+      if (existsSync(envPath)) {
+        const parsed = parseEnvFile(readFileSync(envPath, "utf8"));
+        if (parsed.TWILIO_VOICE_MODE) {
+          env.TWILIO_VOICE_MODE = parsed.TWILIO_VOICE_MODE;
+        }
+      }
+    }
     if (flags["strict-egress"] === "1" || flags["strict-egress"] === "true") {
       env.STRICT_EGRESS = "1";
     }
@@ -785,6 +842,14 @@ function handleSmoke(args: string[], context: CliContext): void {
     if (flags.message) env.SMOKE_OUTBOUND_TEXT_EN = flags.message;
     if (flags["target-language"]) env.SMOKE_OUTBOUND_TARGET_LANGUAGE = flags["target-language"];
     runNodeScript("scripts/smoke-outbound.mjs", context, env);
+    return;
+  }
+
+  if (mode === "twilio-stream") {
+    const env: Dict = {};
+    if (flags["base-url"]) env.BASE_URL = flags["base-url"];
+    if (flags["env-path"]) env.ENV_PATH = resolve(context.projectRoot, flags["env-path"]);
+    runNodeScript("scripts/smoke-twilio-stream.mjs", context, env);
     return;
   }
 
@@ -1362,7 +1427,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone update [--test] [--no-restart]\n`);
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
-  process.stdout.write(`  sandalphone smoke <live|inbound|outbound>\n`);
+  process.stdout.write(`  sandalphone smoke <live|inbound|outbound|twilio-stream>\n`);
   process.stdout.write(`  sandalphone urls [--env-path .env] [--base-url https://...]\n`);
   process.stdout.write(`  sandalphone openclaw command --command \"...\" [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session <list|set|debug>\n`);
@@ -1387,11 +1452,12 @@ function printFunnelHelp(): void {
 
 function printSmokeHelp(): void {
   process.stdout.write(`Smoke actions:\n`);
-  process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress]\n`);
+  process.stdout.write(`  sandalphone smoke live [--base-url URL] [--secret SECRET] [--strict-egress] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone smoke inbound --status [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone smoke inbound --enable [--message "text"] [--timeout MS] [--no-watch] [--no-strict-completion] [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone smoke inbound --disable [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone smoke outbound [--to E164] [--from E164] [--message "text"]\n`);
+  process.stdout.write(`  sandalphone smoke twilio-stream [--base-url URL] [--env-path .env]\n`);
   process.stdout.write(`\n`);
 }
 

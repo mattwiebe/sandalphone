@@ -62,7 +62,11 @@ type RunningApp = {
   stop: () => Promise<void>;
 };
 
-async function startSmokeApp(): Promise<RunningApp> {
+async function startSmokeApp(opts?: {
+  twilioVoiceMode?: "dial" | "stream";
+  publicBaseUrl?: string;
+  twilioStreamWsUrl?: string;
+}): Promise<RunningApp> {
   const logger = makeLogger("error");
   const egressStore = new EgressStore(16);
   let orchestratorRef: VoiceOrchestrator | undefined;
@@ -109,6 +113,9 @@ async function startSmokeApp(): Promise<RunningApp> {
     egressStore,
     asteriskSharedSecret: "smokesecret",
     controlApiSecret: "controlsecret",
+    twilioVoiceMode: opts?.twilioVoiceMode,
+    publicBaseUrl: opts?.publicBaseUrl,
+    twilioStreamWsUrl: opts?.twilioStreamWsUrl,
     openClawBridge,
   });
   await once(server, "listening");
@@ -149,6 +156,47 @@ test("smoke: health + twilio voice endpoint", async () => {
     assert.equal(twilio.status, 200);
     const twiml = await twilio.text();
     assert.ok(twiml.includes("+15555550100"));
+  } finally {
+    await app.stop();
+  }
+});
+
+test("smoke: twilio voice endpoint can return stream TwiML", async () => {
+  const app = await startSmokeApp({
+    twilioVoiceMode: "stream",
+    publicBaseUrl: "https://voice.example.com",
+  });
+  try {
+    const twilio = await fetch(`${app.baseUrl}/twilio/voice`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "CallSid=CA_TEST_STREAM&From=%2B15551234567&To=%2B18005550199",
+    });
+    assert.equal(twilio.status, 200);
+    const twiml = await twilio.text();
+    assert.equal(twiml.includes("<Connect>"), true);
+    assert.equal(twiml.includes("<Stream"), true);
+    assert.equal(twiml.includes("wss://voice.example.com/twilio/stream"), true);
+    assert.equal(twiml.includes("<Dial>"), false);
+  } finally {
+    await app.stop();
+  }
+});
+
+test("smoke: twilio stream mode falls back to dial when no stream URL is available", async () => {
+  const app = await startSmokeApp({
+    twilioVoiceMode: "stream",
+  });
+  try {
+    const twilio = await fetch(`${app.baseUrl}/twilio/voice`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "CallSid=CA_TEST_STREAM_FALLBACK&From=%2B15551234567&To=%2B18005550199",
+    });
+    assert.equal(twilio.status, 200);
+    const twiml = await twilio.text();
+    assert.equal(twiml.includes("<Dial>"), true);
+    assert.equal(twiml.includes("<Connect>"), false);
   } finally {
     await app.stop();
   }

@@ -16,6 +16,8 @@ function baseConfig(): AppConfig {
     googleTtsVoiceEs: "es-US-Standard-A",
     egressMaxQueuePerSession: 64,
     stubSttText: undefined,
+    twilioVoiceMode: "dial",
+    twilioStreamWsUrl: undefined,
     openClawBridgeTimeoutMs: 1200,
   };
 }

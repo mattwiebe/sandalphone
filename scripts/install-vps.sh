@@ -20,6 +20,8 @@ TAILSCALE_READY="0"
 GOOGLE_CLOUD_API_KEY="${GOOGLE_CLOUD_API_KEY:-}"
 GOOGLE_TTS_VOICE_EN="${GOOGLE_TTS_VOICE_EN:-}"
 GOOGLE_TTS_VOICE_ES="${GOOGLE_TTS_VOICE_ES:-}"
+TWILIO_VOICE_MODE="${TWILIO_VOICE_MODE:-dial}"
+TWILIO_STREAM_WS_URL="${TWILIO_STREAM_WS_URL:-}"
 
 log() {
   echo "[sandalphone] $*"
@@ -243,6 +245,8 @@ write_env() {
   set_env_key "${env_path}" "OUTBOUND_TARGET_E164" "${OUTBOUND_TARGET_E164}"
   set_env_key "${env_path}" "TWILIO_AUTH_TOKEN" "${TWILIO_AUTH_TOKEN}"
   set_env_key "${env_path}" "PUBLIC_BASE_URL" "${PUBLIC_BASE_URL}"
+  set_env_key "${env_path}" "TWILIO_VOICE_MODE" "${TWILIO_VOICE_MODE}"
+  set_env_key "${env_path}" "TWILIO_STREAM_WS_URL" "${TWILIO_STREAM_WS_URL}"
   set_env_key "${env_path}" "TWILIO_PHONE_NUMBER" "${TWILIO_PHONE_NUMBER}"
   set_env_key "${env_path}" "VOIPMS_DID" "${VOIPMS_DID}"
   set_env_key "${env_path}" "ASTERISK_SHARED_SECRET" "${ASTERISK_SHARED_SECRET}"

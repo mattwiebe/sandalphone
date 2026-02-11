@@ -94,7 +94,8 @@ sandalphone test
 sandalphone test smoke
 sandalphone test quick
 sandalphone smoke live --base-url https://voice.yourdomain.com
-sandalphone smoke inbound --enable --message "Inbound test mode. Speaking and hanging up."
+sandalphone smoke twilio-stream
+sandalphone smoke inbound --enable
 sandalphone smoke inbound --status
 sandalphone smoke inbound --disable
 sandalphone smoke outbound --to +15551234567
@@ -200,6 +201,19 @@ sandalphone funnel reset --clear-env
 
 `sandalphone funnel up` writes detected URL into `.env` as `PUBLIC_BASE_URL`.
 If auto-detection fails, run `tailscale funnel status`, copy the `https://...` host, and paste it into `PUBLIC_BASE_URL`.
+
+### Twilio Stream Mode
+Use stream mode to feed Twilio audio into the translation pipeline:
+
+- Set `TWILIO_VOICE_MODE=stream`
+- Set `PUBLIC_BASE_URL=https://...` **or** `TWILIO_STREAM_WS_URL=wss://.../twilio/stream`
+- Keep `TWILIO_VOICE_MODE=dial` as fallback until stream path is fully validated
+
+Validate stream TwiML quickly:
+
+```bash
+sandalphone smoke twilio-stream
+```
 
 ## Current Endpoints
 - `GET /health`
@@ -379,6 +393,8 @@ Alternative locator:
 - `STUB_STT_TEXT` (optional text emitted by stub STT provider for local e2e validation)
 - `TWILIO_AUTH_TOKEN` (optional; enables Twilio signature validation)
 - `PUBLIC_BASE_URL` (optional override for signature URL, e.g. `https://voice.yourdomain.com`)
+- `TWILIO_VOICE_MODE` (`dial` or `stream`; default `dial`)
+- `TWILIO_STREAM_WS_URL` (optional explicit stream websocket URL; when empty derives from `PUBLIC_BASE_URL` as `/twilio/stream`)
 - `OPENCLAW_BRIDGE_URL` (optional HTTP endpoint for call/session events and command relay)
 - `OPENCLAW_BRIDGE_API_KEY` (optional bearer token for bridge endpoint)
 - `OPENCLAW_BRIDGE_TIMEOUT_MS` (default `1200`)

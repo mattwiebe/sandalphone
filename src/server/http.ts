@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import type { VoiceOrchestrator } from "../pipeline/orchestrator.js";
-import { buildTwimlSayAndHangup, handleTwilioInbound } from "../ingress/twilio.js";
+import { buildTwimlForStream, buildTwimlSayAndHangup, handleTwilioInbound } from "../ingress/twilio.js";
 import {
   handleAsteriskInbound,
   mapAsteriskMediaToFrame,
@@ -57,6 +57,8 @@ export function startHttpServer(
     readonly egressStore: EgressStore;
     readonly twilioAuthToken?: string;
     readonly publicBaseUrl?: string;
+    readonly twilioVoiceMode?: "dial" | "stream";
+    readonly twilioStreamWsUrl?: string;
     readonly controlApiSecret?: string;
     readonly openClawBridge?: OpenClawBridge;
   },
@@ -273,9 +275,21 @@ export function startHttpServer(
           return;
         }
         const result = handleTwilioInbound(orchestrator, body);
+        const voiceMode = opts.twilioVoiceMode ?? "dial";
+        let twiml = result.twiml;
+        if (voiceMode === "stream") {
+          const streamWsUrl = resolveTwilioStreamWsUrl(opts.twilioStreamWsUrl, opts.publicBaseUrl);
+          if (streamWsUrl) {
+            twiml = buildTwimlForStream(streamWsUrl);
+          } else {
+            logger.warn("twilio stream mode requested without stream URL; falling back to dial", {
+              callSid: body.CallSid ?? "unknown",
+            });
+          }
+        }
         res.statusCode = 200;
         res.setHeader("content-type", "application/xml");
-        res.end(result.twiml);
+        res.end(twiml);
         return;
       }
 
@@ -471,4 +485,21 @@ function estimateInboundTestCompletionDelayMs(message: string): number {
   const chars = Math.max(message.trim().length, 1);
   const speechMs = Math.ceil((chars / 13) * 1000);
   return Math.max(2500, speechMs + 1500);
+}
+
+function resolveTwilioStreamWsUrl(
+  configuredWsUrl: string | undefined,
+  publicBaseUrl: string | undefined,
+): string | undefined {
+  const explicit = configuredWsUrl?.trim();
+  if (explicit) return explicit;
+  const base = publicBaseUrl?.trim();
+  if (!base) return undefined;
+  if (/^https:\/\//.test(base)) {
+    return `wss://${base.slice("https://".length).replace(/\/+$/, "")}/twilio/stream`;
+  }
+  if (/^http:\/\//.test(base)) {
+    return `ws://${base.slice("http://".length).replace(/\/+$/, "")}/twilio/stream`;
+  }
+  return undefined;
 }

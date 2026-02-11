@@ -6,6 +6,7 @@ const controlSecret = process.env.CONTROL_API_SECRET;
 const strictEgress = process.env.STRICT_EGRESS === "1";
 const source = process.env.SMOKE_SOURCE ?? "voipms";
 const callId = process.env.SMOKE_CALL_ID ?? `sip-live-${Date.now()}`;
+const twilioVoiceMode = (process.env.TWILIO_VOICE_MODE ?? "dial").toLowerCase();
 
 function log(step, detail) {
   const suffix = detail ? ` ${detail}` : "";
@@ -50,7 +51,13 @@ async function run() {
   });
   if (!twilio.ok) throw new Error(`/twilio/voice returned ${twilio.status}`);
   const twiml = await twilio.text();
-  if (!twiml.includes("<Dial>")) throw new Error("/twilio/voice did not return TwiML Dial response");
+  if (twilioVoiceMode === "stream") {
+    if (!twiml.includes("<Connect>") || !twiml.includes("<Stream")) {
+      throw new Error("/twilio/voice did not return TwiML stream response");
+    }
+  } else if (!twiml.includes("<Dial>")) {
+    throw new Error("/twilio/voice did not return TwiML Dial response");
+  }
   log("twilio-voice", "ok");
 
   const inbound = await fetch(`${baseUrl}/asterisk/inbound`, {

@@ -45,6 +45,8 @@ function main(): void {
     egressStore,
     twilioAuthToken: config.twilioAuthToken,
     publicBaseUrl: config.publicBaseUrl,
+    twilioVoiceMode: config.twilioVoiceMode,
+    twilioStreamWsUrl: config.twilioStreamWsUrl,
     controlApiSecret: config.controlApiSecret,
     openClawBridge,
   });

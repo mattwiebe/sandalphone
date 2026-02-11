@@ -21,6 +21,17 @@ export function buildTwimlForBridge(outboundTargetE164: string): string {
   ].join("\n");
 }
 
+export function buildTwimlForStream(streamWsUrl: string): string {
+  return [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+    "<Response>",
+    "  <Connect>",
+    `    <Stream url="${escapeXml(streamWsUrl)}" />`,
+    "  </Connect>",
+    "</Response>",
+  ].join("\n");
+}
+
 export function buildTwimlSayAndHangup(lines: Array<{ text: string; language: "en-US" | "es-MX" }>): string {
   const sayLines = lines
     .filter((line) => line.text.trim().length > 0)

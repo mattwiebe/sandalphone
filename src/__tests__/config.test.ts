@@ -15,6 +15,7 @@ test("loadConfig defaults OUTBOUND_TARGET_E164 when unset", () => {
   });
 
   assert.equal(config.outboundTargetE164, "+15555550100");
+  assert.equal(config.twilioVoiceMode, "dial");
 });
 
 test("loadConfig rejects invalid OPENCLAW_BRIDGE_TIMEOUT_MS", () => {
@@ -24,5 +25,22 @@ test("loadConfig rejects invalid OPENCLAW_BRIDGE_TIMEOUT_MS", () => {
         OPENCLAW_BRIDGE_TIMEOUT_MS: "50",
       }),
     /Invalid OPENCLAW_BRIDGE_TIMEOUT_MS/,
+  );
+});
+
+test("loadConfig accepts TWILIO_VOICE_MODE=stream", () => {
+  const config = loadConfig({
+    TWILIO_VOICE_MODE: "stream",
+  });
+  assert.equal(config.twilioVoiceMode, "stream");
+});
+
+test("loadConfig rejects invalid TWILIO_VOICE_MODE", () => {
+  assert.throws(
+    () =>
+      loadConfig({
+        TWILIO_VOICE_MODE: "bad",
+      }),
+    /Invalid TWILIO_VOICE_MODE/,
   );
 });

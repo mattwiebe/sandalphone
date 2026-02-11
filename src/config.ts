@@ -11,6 +11,8 @@ export interface AppConfig {
   readonly stubSttText?: string;
   readonly twilioAuthToken?: string;
   readonly publicBaseUrl?: string;
+  readonly twilioVoiceMode: "dial" | "stream";
+  readonly twilioStreamWsUrl?: string;
   readonly controlApiSecret?: string;
   readonly openClawBridgeUrl?: string;
   readonly openClawBridgeApiKey?: string;
@@ -40,6 +42,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     throw new Error(`Invalid OPENCLAW_BRIDGE_TIMEOUT_MS: ${env.OPENCLAW_BRIDGE_TIMEOUT_MS}`);
   }
 
+  const twilioVoiceModeRaw = (env.TWILIO_VOICE_MODE ?? "dial").trim().toLowerCase();
+  if (twilioVoiceModeRaw !== "dial" && twilioVoiceModeRaw !== "stream") {
+    throw new Error(`Invalid TWILIO_VOICE_MODE: ${env.TWILIO_VOICE_MODE}`);
+  }
+
   return {
     port,
     outboundTargetE164,
@@ -54,6 +61,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     stubSttText: env.STUB_STT_TEXT,
     twilioAuthToken: env.TWILIO_AUTH_TOKEN,
     publicBaseUrl: env.PUBLIC_BASE_URL,
+    twilioVoiceMode: twilioVoiceModeRaw as "dial" | "stream",
+    twilioStreamWsUrl: env.TWILIO_STREAM_WS_URL,
     controlApiSecret: env.CONTROL_API_SECRET,
     openClawBridgeUrl: env.OPENCLAW_BRIDGE_URL,
     openClawBridgeApiKey: env.OPENCLAW_BRIDGE_API_KEY,

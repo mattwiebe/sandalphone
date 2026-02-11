@@ -39,6 +39,17 @@ if (process.env.TWILIO_AUTH_TOKEN && !process.env.PUBLIC_BASE_URL) {
 if (process.env.TWILIO_PHONE_NUMBER && !process.env.TWILIO_ACCOUNT_SID) {
   warnings.push("TWILIO_ACCOUNT_SID is not set; `sandalphone smoke outbound` cannot place test calls");
 }
+const twilioVoiceMode = (process.env.TWILIO_VOICE_MODE ?? "dial").trim().toLowerCase();
+if (twilioVoiceMode !== "dial" && twilioVoiceMode !== "stream") {
+  failures.push("TWILIO_VOICE_MODE must be dial or stream");
+}
+const twilioStreamWsUrl = (process.env.TWILIO_STREAM_WS_URL ?? "").trim();
+if (twilioStreamWsUrl && !/^wss?:\/\//.test(twilioStreamWsUrl)) {
+  failures.push("TWILIO_STREAM_WS_URL must start with ws:// or wss://");
+}
+if (twilioVoiceMode === "stream" && !twilioStreamWsUrl && !process.env.PUBLIC_BASE_URL) {
+  failures.push("TWILIO_VOICE_MODE=stream requires PUBLIC_BASE_URL or TWILIO_STREAM_WS_URL");
+}
 
 if (!process.env.ASTERISK_SHARED_SECRET) {
   warnings.push("ASTERISK_SHARED_SECRET is not set; Asterisk ingress endpoints are unauthenticated");
