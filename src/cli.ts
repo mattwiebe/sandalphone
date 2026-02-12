@@ -1037,7 +1037,7 @@ async function handleSession(args: string[], context: CliContext): Promise<void>
   }
 
   if (action === "set") {
-    const { sessionId, callId } = resolveSessionLocator(flags, "session set");
+    const { sessionId, callId } = await resolveSessionLocator(baseUrl, headers, flags, "session set");
     if (!flags.mode && !flags["source-language"] && !flags["target-language"]) {
       die("session set requires --mode and/or language flags");
     }
@@ -1054,7 +1054,12 @@ async function handleSession(args: string[], context: CliContext): Promise<void>
   }
 
   if (action === "passthrough") {
-    const { sessionId, callId } = resolveSessionLocator(flags, "session passthrough");
+    const { sessionId, callId } = await resolveSessionLocator(
+      baseUrl,
+      headers,
+      flags,
+      "session passthrough",
+    );
     await postSessionControl(baseUrl, headers, {
       sessionId,
       callId,
@@ -1070,7 +1075,12 @@ async function handleSession(args: string[], context: CliContext): Promise<void>
     if (toggleMode !== "on" && toggleMode !== "off" && toggleMode !== "toggle") {
       die("session translation expects one of: on | off | toggle");
     }
-    const { sessionId, callId } = resolveSessionLocator(flags, "session translation");
+    const { sessionId, callId } = await resolveSessionLocator(
+      baseUrl,
+      headers,
+      flags,
+      "session translation",
+    );
     let mode: SessionMode;
     if (toggleMode === "on") {
       mode = "private_translation";
@@ -1094,9 +1104,10 @@ async function handleSession(args: string[], context: CliContext): Promise<void>
   }
 
   if (action === "debug") {
-    const sessionId = flags["session-id"];
+    const locator = await resolveSessionLocator(baseUrl, headers, flags, "session debug");
+    const sessionId = locator.sessionId;
     if (!sessionId) {
-      die("session debug requires --session-id");
+      die("session debug requires --session-id (call-id is not supported for debug)");
     }
     const response = await fetch(`${baseUrl}/sessions/${encodeURIComponent(sessionId)}/debug`, {
       headers,
@@ -1138,16 +1149,49 @@ async function postSessionControl(
   }
 }
 
-function resolveSessionLocator(
+async function resolveSessionLocator(
+  baseUrl: string,
+  headers: Record<string, string>,
   flags: Record<string, string>,
   commandLabel: string,
-): { sessionId?: string; callId?: string } {
+): Promise<{ sessionId?: string; callId?: string }> {
   const sessionId = flags["session-id"];
   const callId = flags["call-id"];
-  if (!sessionId && !callId) {
-    die(`${commandLabel} requires --session-id or --call-id`);
+  if (sessionId || callId) {
+    return { sessionId, callId };
   }
-  return { sessionId, callId };
+
+  const response = await fetch(`${baseUrl}/sessions`, { headers });
+  if (!response.ok) {
+    const body = await response.text();
+    die(`${commandLabel} failed to auto-select session (${response.status}): ${body.slice(0, 300)}`);
+  }
+  const payload = (await response.json()) as {
+    sessions?: Array<{
+      id: string;
+      state: string;
+      source: string;
+      mode: string;
+      sourceLanguage: string;
+      targetLanguage: string;
+    }>;
+  };
+  const sessions = payload.sessions ?? [];
+  const candidates = sessions.filter((session) => session.state === "active" || session.state === "pending");
+  if (candidates.length === 1) {
+    process.stdout.write(`[sandalphone] auto-selected session ${candidates[0].id}\n`);
+    return { sessionId: candidates[0].id };
+  }
+  if (candidates.length === 0) {
+    die(`${commandLabel} requires --session-id or --call-id (no active session found)`);
+  }
+
+  const listed = candidates
+    .map((session) => `${session.id}(${session.state},${session.mode},${session.sourceLanguage}->${session.targetLanguage})`)
+    .join(", ");
+  die(
+    `${commandLabel} found multiple active sessions; pass --session-id. candidates: ${listed}`,
+  );
 }
 
 async function fetchSessionMode(
@@ -1615,6 +1659,7 @@ function printOpenClawHelp(): void {
 
 function printSessionHelp(): void {
   process.stdout.write(`Session actions:\n`);
+  process.stdout.write(`  (if exactly one active session exists, --session-id can be omitted)\n`);
   process.stdout.write(`  sandalphone session list [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session set --session-id ID --mode passthrough [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session set --call-id sip-123 --source voipms --target-language es\n`);

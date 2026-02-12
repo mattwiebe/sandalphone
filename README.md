@@ -122,6 +122,8 @@ sandalphone service status
 sandalphone service logs --lines 200
 ```
 
+If exactly one active session exists, session commands auto-select it and `--session-id` is optional.
+
 ## Smoke Test
 With server running on port `8080`:
 
