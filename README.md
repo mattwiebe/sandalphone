@@ -99,6 +99,10 @@ sandalphone smoke inbound --enable
 sandalphone smoke inbound --status
 sandalphone smoke inbound --disable
 sandalphone smoke outbound --to +15551234567
+sandalphone session passthrough --session-id <id>
+sandalphone session translation on --session-id <id>
+sandalphone session translation off --session-id <id>
+sandalphone session translation toggle --session-id <id>
 sandalphone session list
 sandalphone session set --session-id <id> --mode passthrough
 sandalphone session debug --session-id <id>
@@ -186,6 +190,7 @@ If `--to` is omitted, it uses `OUTBOUND_TARGET_E164`. If that is missing, CLI pr
 - `git pull --ff-only`
 - dependency install (`npm ci` when lockfile exists)
 - `npm run build`
+- env migration checks (prompts to add missing required keys such as `TWILIO_VOICE_MODE`)
 - systemd restart on Linux when `sandalphone-vps-gateway.service` exists
 
 Use `--no-restart` to skip service restart.
@@ -218,8 +223,10 @@ sandalphone smoke twilio-stream
 Live translation toggle during an active call:
 
 ```bash
-sandalphone session set --session-id <id> --mode passthrough
-sandalphone session set --session-id <id> --mode private_translation
+sandalphone session passthrough --session-id <id>
+sandalphone session translation on --session-id <id>
+sandalphone session translation off --session-id <id>
+sandalphone session translation toggle --session-id <id>
 ```
 
 ## Current Endpoints

@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { homedir, platform } from "node:os";
 import { applyEnvUpdates, parseEnvFile, type EnvMap } from "./cli-env-file.js";
 import { extractFunnelUrl, extractFunnelUrlFromText } from "./cli-funnel.js";
+import type { SessionMode } from "./domain/types.js";
 
 type Dict = Record<string, string | undefined>;
 
@@ -69,7 +70,7 @@ async function main(argv: string[]): Promise<void> {
       return;
     }
     case "update": {
-      handleUpdate(rest, context);
+      await handleUpdate(rest, context);
       return;
     }
     case "install": {
@@ -726,7 +727,7 @@ function handleTest(args: string[], context: CliContext): void {
   die(`unknown test mode: ${mode}`);
 }
 
-function handleUpdate(args: string[], context: CliContext): void {
+async function handleUpdate(args: string[], context: CliContext): Promise<void> {
   const { flags } = parseFlags(args);
   const runTests = flags.test === "1" || flags.test === "true";
   const noRestart = flags["no-restart"] === "1" || flags["no-restart"] === "true";
@@ -743,6 +744,8 @@ function handleUpdate(args: string[], context: CliContext): void {
   process.stdout.write("[sandalphone] update: npm run build\n");
   runCommandChecked("npm", ["run", "build"], { cwd: context.projectRoot });
 
+  await maybePromptEnvMigrations(context, flags);
+
   if (!noRestart) {
     restartManagedService();
   }
@@ -753,6 +756,44 @@ function handleUpdate(args: string[], context: CliContext): void {
   }
 
   process.stdout.write("[sandalphone] update complete\n");
+}
+
+async function maybePromptEnvMigrations(
+  context: CliContext,
+  flags: Record<string, string>,
+): Promise<void> {
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  if (!existsSync(envPath)) return;
+
+  const envText = readFileSync(envPath, "utf8");
+  const env = parseEnvFile(envText);
+  if (pickNonEmpty(env.TWILIO_VOICE_MODE)) {
+    return;
+  }
+
+  const message = "TWILIO_VOICE_MODE is missing from .env. Add TWILIO_VOICE_MODE=dial now?";
+  const hasTty = process.stdin.isTTY || existsSync("/dev/tty");
+  if (!hasTty) {
+    process.stderr.write(`[sandalphone] WARN ${message}\n`);
+    process.stderr.write("[sandalphone] run: sandalphone install --env-path .env\n");
+    return;
+  }
+
+  const rl = createInterface({
+    input: process.stdin.isTTY ? process.stdin : createReadStream("/dev/tty"),
+    output: process.stdout,
+  });
+  try {
+    const apply = await promptYesNo(rl, message, true);
+    if (apply) {
+      updateEnvFile(envPath, { TWILIO_VOICE_MODE: "dial" }, context.projectRoot);
+      process.stdout.write(`[sandalphone] updated ${envPath}: TWILIO_VOICE_MODE=dial\n`);
+    } else {
+      process.stderr.write("[sandalphone] WARN continuing with missing TWILIO_VOICE_MODE\n");
+    }
+  } finally {
+    rl.close();
+  }
 }
 
 function restartManagedService(): void {
@@ -958,7 +999,7 @@ async function handleSession(args: string[], context: CliContext): Promise<void>
     return;
   }
 
-  const { flags } = parseFlags(args.slice(1));
+  const { flags, extras } = parseFlags(args.slice(1));
   const baseUrl = resolveGatewayBaseUrl(context, flags);
   const headers: Record<string, string> = {};
   const controlSecret = resolveControlSecret(context, flags);
@@ -996,34 +1037,59 @@ async function handleSession(args: string[], context: CliContext): Promise<void>
   }
 
   if (action === "set") {
-    const sessionId = flags["session-id"];
-    const callId = flags["call-id"];
-    if (!sessionId && !callId) {
-      die("session set requires --session-id or --call-id");
-    }
+    const { sessionId, callId } = resolveSessionLocator(flags, "session set");
     if (!flags.mode && !flags["source-language"] && !flags["target-language"]) {
       die("session set requires --mode and/or language flags");
     }
-    const response = await fetch(`${baseUrl}/sessions/control`, {
-      method: "POST",
-      headers: {
-        ...headers,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        sessionId,
-        callId,
-        source: flags.source,
-        mode: flags.mode,
-        sourceLanguage: flags["source-language"],
-        targetLanguage: flags["target-language"],
-      }),
+    await postSessionControl(baseUrl, headers, {
+      sessionId,
+      callId,
+      source: flags.source,
+      mode: flags.mode,
+      sourceLanguage: flags["source-language"],
+      targetLanguage: flags["target-language"],
     });
-    if (!response.ok) {
-      const body = await response.text();
-      die(`session set failed with ${response.status}: ${body.slice(0, 300)}`);
-    }
     process.stdout.write("[sandalphone] session updated\n");
+    return;
+  }
+
+  if (action === "passthrough") {
+    const { sessionId, callId } = resolveSessionLocator(flags, "session passthrough");
+    await postSessionControl(baseUrl, headers, {
+      sessionId,
+      callId,
+      source: flags.source,
+      mode: "passthrough",
+    });
+    process.stdout.write("[sandalphone] session mode=passthrough\n");
+    return;
+  }
+
+  if (action === "translate" || action === "translation") {
+    const toggleMode = (extras[0] ?? "on").toLowerCase();
+    if (toggleMode !== "on" && toggleMode !== "off" && toggleMode !== "toggle") {
+      die("session translation expects one of: on | off | toggle");
+    }
+    const { sessionId, callId } = resolveSessionLocator(flags, "session translation");
+    let mode: SessionMode;
+    if (toggleMode === "on") {
+      mode = "private_translation";
+    } else if (toggleMode === "off") {
+      mode = "passthrough";
+    } else {
+      if (!sessionId) {
+        die("session translation toggle requires --session-id");
+      }
+      const current = await fetchSessionMode(baseUrl, headers, sessionId);
+      mode = current === "private_translation" ? "passthrough" : "private_translation";
+    }
+    await postSessionControl(baseUrl, headers, {
+      sessionId,
+      callId,
+      source: flags.source,
+      mode,
+    });
+    process.stdout.write(`[sandalphone] session mode=${mode}\n`);
     return;
   }
 
@@ -1044,6 +1110,68 @@ async function handleSession(args: string[], context: CliContext): Promise<void>
   }
 
   die(`unknown session action: ${action}`);
+}
+
+async function postSessionControl(
+  baseUrl: string,
+  headers: Record<string, string>,
+  payload: {
+    sessionId?: string;
+    callId?: string;
+    source?: string;
+    mode?: string;
+    sourceLanguage?: string;
+    targetLanguage?: string;
+  },
+): Promise<void> {
+  const response = await fetch(`${baseUrl}/sessions/control`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    die(`session set failed with ${response.status}: ${body.slice(0, 300)}`);
+  }
+}
+
+function resolveSessionLocator(
+  flags: Record<string, string>,
+  commandLabel: string,
+): { sessionId?: string; callId?: string } {
+  const sessionId = flags["session-id"];
+  const callId = flags["call-id"];
+  if (!sessionId && !callId) {
+    die(`${commandLabel} requires --session-id or --call-id`);
+  }
+  return { sessionId, callId };
+}
+
+async function fetchSessionMode(
+  baseUrl: string,
+  headers: Record<string, string>,
+  sessionId: string,
+): Promise<SessionMode> {
+  const response = await fetch(`${baseUrl}/sessions/${encodeURIComponent(sessionId)}/debug`, {
+    headers,
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    die(`session debug failed with ${response.status}: ${body.slice(0, 300)}`);
+  }
+  const payload = (await response.json()) as {
+    session?: {
+      mode?: string;
+    };
+  };
+  const mode = payload.session?.mode;
+  if (mode !== "passthrough" && mode !== "private_translation") {
+    die(`session ${sessionId} has unknown mode: ${mode ?? "missing"}`);
+  }
+  return mode;
 }
 
 function resolveGatewayBaseUrl(context: CliContext, flags: Record<string, string>): string {
@@ -1424,13 +1552,13 @@ function printHelp(): void {
   process.stdout.write(`  If global command is missing: run scripts/install-vps.sh or create a wrapper in /usr/local/bin\n\n`);
   process.stdout.write(`Usage:\n`);
   process.stdout.write(`  sandalphone install [--env-path PATH]\n`);
-  process.stdout.write(`  sandalphone update [--test] [--no-restart]\n`);
+  process.stdout.write(`  sandalphone update [--test] [--no-restart] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone build|check|dev|start\n`);
   process.stdout.write(`  sandalphone test [all|smoke|quick]\n`);
   process.stdout.write(`  sandalphone smoke <live|inbound|outbound|twilio-stream>\n`);
   process.stdout.write(`  sandalphone urls [--env-path .env] [--base-url https://...]\n`);
   process.stdout.write(`  sandalphone openclaw command --command \"...\" [--base-url URL] [--secret SECRET]\n`);
-  process.stdout.write(`  sandalphone session <list|set|debug>\n`);
+  process.stdout.write(`  sandalphone session <list|set|passthrough|translation|translate|debug>\n`);
   process.stdout.write(`  sandalphone funnel <action>\n`);
   process.stdout.write(`  sandalphone doctor deploy [--env-path .env]\n`);
   process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);
@@ -1490,7 +1618,12 @@ function printSessionHelp(): void {
   process.stdout.write(`  sandalphone session list [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session set --session-id ID --mode passthrough [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session set --call-id sip-123 --source voipms --target-language es\n`);
-  process.stdout.write(`  sandalphone session debug --session-id ID\n`);
+  process.stdout.write(`  sandalphone session passthrough --session-id ID [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone session translation on --session-id ID [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone session translation off --session-id ID [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone session translation toggle --session-id ID [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone session translate --session-id ID [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone session debug --session-id ID [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`\n`);
 }
 
