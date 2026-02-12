@@ -215,6 +215,13 @@ Validate stream TwiML quickly:
 sandalphone smoke twilio-stream
 ```
 
+Live translation toggle during an active call:
+
+```bash
+sandalphone session set --session-id <id> --mode passthrough
+sandalphone session set --session-id <id> --mode private_translation
+```
+
 ## Current Endpoints
 - `GET /health`
 - `GET /sessions/:sessionId/debug`

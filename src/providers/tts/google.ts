@@ -33,7 +33,8 @@ export class GoogleTtsProvider implements TtsProvider {
     const payload = {
       input: { text: chunk.text },
       voice: { languageCode, name: voiceName },
-      audioConfig: { audioEncoding: "LINEAR16", sampleRateHertz: 16000 },
+      // Use Twilio-compatible stream format so chunks can be injected directly.
+      audioConfig: { audioEncoding: "MULAW", sampleRateHertz: 8000 },
     };
 
     let response: Response;
@@ -68,8 +69,8 @@ export class GoogleTtsProvider implements TtsProvider {
 
     return {
       sessionId: chunk.sessionId,
-      encoding: "pcm_s16le",
-      sampleRateHz: 16000,
+      encoding: "mulaw",
+      sampleRateHz: 8000,
       payload: audio,
       timestampMs: Date.now(),
     };

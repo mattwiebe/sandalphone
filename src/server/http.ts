@@ -82,7 +82,7 @@ export function startHttpServer(
   };
 
   twilioWs.on("connection", (ws) => {
-    wireTwilioMediaSocket(ws, orchestrator, logger);
+    wireTwilioMediaSocket(ws, orchestrator, logger, opts.egressStore);
   });
 
   const server = createServer(async (req, res) => {
@@ -139,6 +139,9 @@ export function startHttpServer(
         });
         if (!updated) {
           return writeJson(res, 404, { error: "session_not_found" });
+        }
+        if (updated.mode === "passthrough") {
+          opts.egressStore.clear(updated.id);
         }
         return writeJson(res, 200, { session: updated });
       }
