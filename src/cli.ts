@@ -1201,8 +1201,18 @@ async function handleMode(args: string[], context: CliContext): Promise<void> {
     next = current === "private_translation" ? "passthrough" : "private_translation";
   }
 
-  updateEnvFile(envPath, { DEFAULT_SESSION_MODE: next }, context.projectRoot);
+  const envUpdates: EnvMap = { DEFAULT_SESSION_MODE: next };
+  // Translation cannot run on Twilio Dial mode, so turning translation on should
+  // ensure new calls arrive on the media stream path.
+  if (next === "private_translation" && (env.TWILIO_VOICE_MODE ?? "dial").trim().toLowerCase() !== "stream") {
+    envUpdates.TWILIO_VOICE_MODE = "stream";
+  }
+
+  updateEnvFile(envPath, envUpdates, context.projectRoot);
   process.stdout.write(`[sandalphone] default_session_mode=${next}\n`);
+  if (envUpdates.TWILIO_VOICE_MODE === "stream") {
+    process.stdout.write("[sandalphone] twilio_voice_mode=stream (auto-enabled for translation)\n");
+  }
   process.stdout.write("[sandalphone] applies to new calls; existing calls keep their current mode\n");
 }
 

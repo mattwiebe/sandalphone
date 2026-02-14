@@ -128,6 +128,7 @@ sandalphone service logs --lines 200
 
 If exactly one active session exists, session commands auto-select it and `--session-id` is optional.
 Use `sandalphone mode translation on|off|toggle` to set the default for new calls when no session is active.
+When mode is set to translation `on`, Sandalphone also auto-sets `TWILIO_VOICE_MODE=stream` for new calls.
 
 ## Smoke Test
 With server running on port `8080`:
