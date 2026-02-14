@@ -60,6 +60,8 @@ async function run() {
   log("base-url", baseUrl);
   log("env-path", envPath);
 
+  await waitForGatewayReady(baseUrl);
+
   if (expectedMode !== "stream") {
     throw new Error("TWILIO_VOICE_MODE is not stream");
   }
@@ -119,6 +121,28 @@ function resolveBaseUrl() {
   if (explicit) return explicit.replace(/\/+$/, "");
   const port = resolveValue("PORT", "8080");
   return `http://127.0.0.1:${port}`.replace(/\/+$/, "");
+}
+
+async function waitForGatewayReady(baseUrl) {
+  const deadlineMs = Date.now() + 15000;
+  let lastError = "";
+  while (Date.now() < deadlineMs) {
+    try {
+      const response = await fetch(`${baseUrl}/health`);
+      if (response.ok) {
+        return;
+      }
+      lastError = `/health returned ${response.status}`;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await sleep(500);
+  }
+  throw new Error(`gateway health check failed at ${baseUrl}: ${lastError}`);
+}
+
+function sleep(ms) {
+  return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 }
 
 run().catch((error) => {
