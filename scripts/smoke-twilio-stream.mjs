@@ -2,6 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createHmac } from "node:crypto";
 
 const envPath = resolve(process.env.ENV_PATH ?? ".env");
 let cachedEnvMap;
@@ -51,6 +52,7 @@ async function run() {
   const expectedMode = resolveValue("TWILIO_VOICE_MODE", "dial").toLowerCase();
   const expectedWsOverride = resolveValue("TWILIO_STREAM_WS_URL");
   const publicBaseUrl = resolveValue("PUBLIC_BASE_URL");
+  const twilioAuthToken = resolveValue("TWILIO_AUTH_TOKEN");
   const expectedWsUrl =
     expectedWsOverride ||
     (publicBaseUrl ? `wss://${publicBaseUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "")}/twilio/stream` : "");
@@ -62,12 +64,27 @@ async function run() {
     throw new Error("TWILIO_VOICE_MODE is not stream");
   }
 
+  const formFields = {
+    CallSid: "CA_STREAM_SMOKE",
+    From: "+15551234567",
+    To: "+18005550199",
+  };
+  const twilioHeaders = { "content-type": "application/x-www-form-urlencoded" };
+  const signatureBaseUrl = (publicBaseUrl || baseUrl).replace(/\/+$/, "");
+  if (twilioAuthToken) {
+    twilioHeaders["x-twilio-signature"] = computeTwilioSignature(
+      `${signatureBaseUrl}/twilio/voice`,
+      formFields,
+      twilioAuthToken,
+    );
+  }
+
   let twilio;
   try {
     twilio = await fetch(`${baseUrl}/twilio/voice`, {
       method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: "CallSid=CA_STREAM_SMOKE&From=%2B15551234567&To=%2B18005550199",
+      headers: twilioHeaders,
+      body: new URLSearchParams(formFields),
     });
   } catch (error) {
     throw new Error(
@@ -86,6 +103,15 @@ async function run() {
   }
   log("twilio-voice", "stream TwiML ok");
   log("result", "PASS");
+}
+
+function computeTwilioSignature(url, formFields, authToken) {
+  const sorted = Object.keys(formFields).sort();
+  let payload = url;
+  for (const key of sorted) {
+    payload += key + formFields[key];
+  }
+  return createHmac("sha1", authToken).update(payload).digest("base64");
 }
 
 function resolveBaseUrl() {
