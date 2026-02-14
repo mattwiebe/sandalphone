@@ -103,6 +103,8 @@ sandalphone session passthrough --session-id <id>
 sandalphone session translation on --session-id <id>
 sandalphone session translation off --session-id <id>
 sandalphone session translation toggle --session-id <id>
+sandalphone session translation on --trusted
+sandalphone session translation off --untrusted
 sandalphone mode status
 sandalphone mode translation on
 sandalphone mode translation off

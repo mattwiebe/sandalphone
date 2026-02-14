@@ -39,6 +39,17 @@ type CommandResult = {
   timedOut?: boolean;
 };
 
+type SessionSummary = {
+  id: string;
+  state: string;
+  source: string;
+  mode: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  inboundCaller?: string;
+  targetPhoneE164?: string;
+};
+
 function pickNonEmpty(...values: Array<string | undefined>): string | undefined {
   for (const value of values) {
     if (value && value.trim().length > 0) return value;
@@ -1115,6 +1126,9 @@ async function handleSession(args: string[], context: CliContext): Promise<void>
     if (toggleMode !== "on" && toggleMode !== "off" && toggleMode !== "toggle") {
       die("session translation expects one of: on | off | toggle");
     }
+    if ((flags.trusted === "1" || flags.trusted === "true") && (flags.untrusted === "1" || flags.untrusted === "true")) {
+      die("session translation cannot use --trusted and --untrusted together");
+    }
     const { sessionId, callId } = await resolveSessionLocator(
       baseUrl,
       headers,
@@ -1263,17 +1277,25 @@ async function resolveSessionLocator(
     die(`${commandLabel} failed to auto-select session (${response.status}): ${body.slice(0, 300)}`);
   }
   const payload = (await response.json()) as {
-    sessions?: Array<{
-      id: string;
-      state: string;
-      source: string;
-      mode: string;
-      sourceLanguage: string;
-      targetLanguage: string;
-    }>;
+    sessions?: SessionSummary[];
   };
   const sessions = payload.sessions ?? [];
-  const candidates = sessions.filter((session) => session.state === "active" || session.state === "pending");
+  let candidates = sessions.filter((session) => session.state === "active" || session.state === "pending");
+  const trusted = flags.trusted === "1" || flags.trusted === "true";
+  const untrusted = flags.untrusted === "1" || flags.untrusted === "true";
+  if (trusted || untrusted) {
+    const envPath = resolve(process.cwd(), flags["env-path"] ?? ".env");
+    const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+    const env = parseEnvFile(envText);
+    const trustedNumber = normalizeDigits(env.OUTBOUND_TARGET_E164 ?? "");
+    if (trustedNumber) {
+      candidates = candidates.filter((session) => {
+        const caller = normalizeDigits(session.inboundCaller ?? "");
+        const isTrusted = caller.length > 0 && caller === trustedNumber;
+        return trusted ? isTrusted : !isTrusted;
+      });
+    }
+  }
   if (candidates.length === 1) {
     process.stdout.write(`[sandalphone] auto-selected session ${candidates[0].id}\n`);
     return { sessionId: candidates[0].id };
@@ -1288,6 +1310,10 @@ async function resolveSessionLocator(
   die(
     `${commandLabel} found multiple active sessions; pass --session-id. candidates: ${listed}`,
   );
+}
+
+function normalizeDigits(value: string): string {
+  return value.replace(/\D/g, "");
 }
 
 async function fetchSessionMode(
@@ -1765,6 +1791,7 @@ function printSessionHelp(): void {
   process.stdout.write(`  sandalphone session translation on --session-id ID [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session translation off --session-id ID [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session translation toggle --session-id ID [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`  sandalphone session translation on --trusted|--untrusted [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session translate --session-id ID [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session debug --session-id ID [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`\n`);
