@@ -3,7 +3,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const baseUrl = (process.env.BASE_URL ?? "http://127.0.0.1:8080").replace(/\/+$/, "");
 const envPath = resolve(process.env.ENV_PATH ?? ".env");
 let cachedEnvMap;
 
@@ -48,6 +47,7 @@ function loadEnvMap() {
 }
 
 async function run() {
+  const baseUrl = resolveBaseUrl();
   const expectedMode = resolveValue("TWILIO_VOICE_MODE", "dial").toLowerCase();
   const expectedWsOverride = resolveValue("TWILIO_STREAM_WS_URL");
   const publicBaseUrl = resolveValue("PUBLIC_BASE_URL");
@@ -62,11 +62,18 @@ async function run() {
     throw new Error("TWILIO_VOICE_MODE is not stream");
   }
 
-  const twilio = await fetch(`${baseUrl}/twilio/voice`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: "CallSid=CA_STREAM_SMOKE&From=%2B15551234567&To=%2B18005550199",
-  });
+  let twilio;
+  try {
+    twilio = await fetch(`${baseUrl}/twilio/voice`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "CallSid=CA_STREAM_SMOKE&From=%2B15551234567&To=%2B18005550199",
+    });
+  } catch (error) {
+    throw new Error(
+      `fetch failed (gateway unreachable at ${baseUrl}; check service status and PORT/.env alignment): ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   if (!twilio.ok) {
     throw new Error(`/twilio/voice returned ${twilio.status}`);
   }
@@ -79,6 +86,13 @@ async function run() {
   }
   log("twilio-voice", "stream TwiML ok");
   log("result", "PASS");
+}
+
+function resolveBaseUrl() {
+  const explicit = process.env.BASE_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const port = resolveValue("PORT", "8080");
+  return `http://127.0.0.1:${port}`.replace(/\/+$/, "");
 }
 
 run().catch((error) => {
