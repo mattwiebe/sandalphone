@@ -222,7 +222,9 @@ Use stream mode to feed Twilio audio into the translation pipeline:
 - Set `TWILIO_VOICE_MODE=stream`
 - Set `PUBLIC_BASE_URL=https://...` **or** `TWILIO_STREAM_WS_URL=wss://.../twilio/stream`
 - Keep `TWILIO_VOICE_MODE=dial` as fallback until stream path is fully validated
-- In stream mode, only calls **from `OUTBOUND_TARGET_E164`** engage `<Connect><Stream>`; all other callers still get normal `<Dial>` forwarding
+- In stream mode:
+  - calls from `OUTBOUND_TARGET_E164` engage `<Connect><Stream>` (controller path)
+  - all other callers use `<Start><Stream>` + `<Dial>` (forward + stream fork)
 
 Validate stream TwiML quickly:
 

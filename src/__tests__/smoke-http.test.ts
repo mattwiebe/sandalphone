@@ -202,6 +202,28 @@ test("smoke: twilio stream mode falls back to dial when no stream URL is availab
   }
 });
 
+test("smoke: twilio stream mode forks stream for untrusted caller while still dialing", async () => {
+  const app = await startSmokeApp({
+    twilioVoiceMode: "stream",
+    publicBaseUrl: "https://voice.example.com",
+  });
+  try {
+    const twilio = await fetch(`${app.baseUrl}/twilio/voice`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "CallSid=CA_TEST_STREAM_UNTRUSTED&From=%2B15551234567&To=%2B18005550199",
+    });
+    assert.equal(twilio.status, 200);
+    const twiml = await twilio.text();
+    assert.equal(twiml.includes("<Start>"), true);
+    assert.equal(twiml.includes("<Stream"), true);
+    assert.equal(twiml.includes("<Dial>"), true);
+    assert.equal(twiml.includes("track=\"both_tracks\""), true);
+  } finally {
+    await app.stop();
+  }
+});
+
 test("smoke: inbound test mode intercepts twilio call and hangs up", async () => {
   const app = await startSmokeApp();
   try {

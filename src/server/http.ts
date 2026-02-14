@@ -3,7 +3,12 @@ import type { Server } from "node:http";
 import { URL } from "node:url";
 import { WebSocketServer } from "ws";
 import type { VoiceOrchestrator } from "../pipeline/orchestrator.js";
-import { buildTwimlForStream, buildTwimlSayAndHangup, handleTwilioInbound } from "../ingress/twilio.js";
+import {
+  buildTwimlForBridgeWithStream,
+  buildTwimlForStream,
+  buildTwimlSayAndHangup,
+  handleTwilioInbound,
+} from "../ingress/twilio.js";
 import {
   handleAsteriskInbound,
   mapAsteriskMediaToFrame,
@@ -286,8 +291,8 @@ export function startHttpServer(
           const streamEligible = session
             ? normalizePhoneForCompare(from) === normalizePhoneForCompare(session.targetPhoneE164)
             : false;
+          const streamWsUrl = resolveTwilioStreamWsUrl(opts.twilioStreamWsUrl, opts.publicBaseUrl);
           if (streamEligible) {
-            const streamWsUrl = resolveTwilioStreamWsUrl(opts.twilioStreamWsUrl, opts.publicBaseUrl);
             if (streamWsUrl) {
               twiml = buildTwimlForStream(streamWsUrl);
               logger.info("twilio stream mode engaged for trusted caller", {
@@ -301,11 +306,23 @@ export function startHttpServer(
               });
             }
           } else {
-            logger.info("twilio stream mode skipped; caller is not trusted stream controller", {
-              callSid: body.CallSid ?? "unknown",
-              from,
-              expectedFrom: session?.targetPhoneE164 ?? "unknown",
-            });
+            if (streamWsUrl && session?.targetPhoneE164) {
+              twiml = buildTwimlForBridgeWithStream(
+                session.targetPhoneE164,
+                streamWsUrl,
+              );
+              logger.info("twilio stream fork engaged for untrusted caller (dial + stream)", {
+                callSid: body.CallSid ?? "unknown",
+                from,
+                expectedFrom: session?.targetPhoneE164 ?? "unknown",
+              });
+            } else {
+              logger.info("twilio stream mode skipped; missing stream URL or target for untrusted caller", {
+                callSid: body.CallSid ?? "unknown",
+                from,
+                expectedFrom: session?.targetPhoneE164 ?? "unknown",
+              });
+            }
           }
         }
         res.statusCode = 200;

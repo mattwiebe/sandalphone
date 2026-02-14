@@ -21,6 +21,21 @@ export function buildTwimlForBridge(outboundTargetE164: string): string {
   ].join("\n");
 }
 
+export function buildTwimlForBridgeWithStream(
+  outboundTargetE164: string,
+  streamWsUrl: string,
+): string {
+  return [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+    "<Response>",
+    "  <Start>",
+    `    <Stream url="${escapeXml(streamWsUrl)}" track="both_tracks" />`,
+    "  </Start>",
+    `  <Dial>${outboundTargetE164}</Dial>`,
+    "</Response>",
+  ].join("\n");
+}
+
 export function buildTwimlForStream(streamWsUrl: string): string {
   return [
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
