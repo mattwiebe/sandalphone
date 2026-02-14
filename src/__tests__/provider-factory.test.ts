@@ -8,6 +8,7 @@ function baseConfig(): AppConfig {
   return {
     port: 8080,
     outboundTargetE164: "+15555550100",
+    defaultSessionMode: "private_translation",
     logLevel: "error",
     asteriskSharedSecret: undefined,
     pipelineMinFrameIntervalMs: 400,

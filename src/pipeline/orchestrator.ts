@@ -18,6 +18,7 @@ export type OrchestratorDeps = {
   readonly translator: TranslationProvider;
   readonly tts: TtsProvider;
   readonly outboundTargetE164: string;
+  readonly defaultSessionMode?: "private_translation" | "passthrough";
   readonly minFrameIntervalMs?: number;
   readonly onTtsChunk?: (chunk: TtsChunk) => Promise<void> | void;
   readonly onSessionEvent?: (event: SessionEvent) => Promise<void> | void;
@@ -40,7 +41,11 @@ export class VoiceOrchestrator {
       return existing;
     }
 
-    const session = this.deps.sessionStore.createFromIncoming(event, this.deps.outboundTargetE164);
+    const session = this.deps.sessionStore.createFromIncoming(
+      event,
+      this.deps.outboundTargetE164,
+      this.deps.defaultSessionMode ?? "private_translation",
+    );
     this.deps.logger.info("incoming call accepted", {
       sessionId: session.id,
       source: event.source,

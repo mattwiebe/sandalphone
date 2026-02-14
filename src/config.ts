@@ -1,6 +1,7 @@
 export interface AppConfig {
   readonly port: number;
   readonly outboundTargetE164: string;
+  readonly defaultSessionMode: "private_translation" | "passthrough";
   readonly logLevel: "debug" | "info" | "warn" | "error";
   readonly asteriskSharedSecret?: string;
   readonly pipelineMinFrameIntervalMs: number;
@@ -26,6 +27,12 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   }
 
   const outboundTargetE164 = env.OUTBOUND_TARGET_E164 ?? "+15555550100";
+  const defaultSessionModeRaw = (env.DEFAULT_SESSION_MODE ?? "private_translation")
+    .trim()
+    .toLowerCase();
+  if (defaultSessionModeRaw !== "private_translation" && defaultSessionModeRaw !== "passthrough") {
+    throw new Error(`Invalid DEFAULT_SESSION_MODE: ${env.DEFAULT_SESSION_MODE}`);
+  }
   const logLevel = (env.LOG_LEVEL ?? "info") as AppConfig["logLevel"];
   const pipelineMinFrameIntervalMs = Number(env.PIPELINE_MIN_FRAME_INTERVAL_MS ?? "400");
   if (!Number.isFinite(pipelineMinFrameIntervalMs) || pipelineMinFrameIntervalMs < 0) {
@@ -50,6 +57,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   return {
     port,
     outboundTargetE164,
+    defaultSessionMode: defaultSessionModeRaw as "private_translation" | "passthrough",
     logLevel,
     asteriskSharedSecret: env.ASTERISK_SHARED_SECRET,
     pipelineMinFrameIntervalMs,

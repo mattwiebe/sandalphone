@@ -101,6 +101,10 @@ async function main(argv: string[]): Promise<void> {
       await handleSession(rest, context);
       return;
     }
+    case "mode": {
+      await handleMode(rest, context);
+      return;
+    }
     case "service": {
       handleService(rest, context);
       return;
@@ -173,6 +177,7 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       OPENCLAW_BRIDGE_URL: currentValues.OPENCLAW_BRIDGE_URL ?? "",
       OPENCLAW_BRIDGE_API_KEY: currentValues.OPENCLAW_BRIDGE_API_KEY ?? "",
       OPENCLAW_BRIDGE_TIMEOUT_MS: currentValues.OPENCLAW_BRIDGE_TIMEOUT_MS ?? "1200",
+      DEFAULT_SESSION_MODE: currentValues.DEFAULT_SESSION_MODE ?? "private_translation",
     };
 
     const updates: EnvMap = {};
@@ -271,6 +276,21 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
     await promptAndPersist("TWILIO_PHONE_NUMBER", "Twilio DID number (optional)", {
       defaultValue: defaults.TWILIO_PHONE_NUMBER,
     });
+    await promptAndPersist(
+      "DEFAULT_SESSION_MODE",
+      "Default call mode for new sessions (private_translation|passthrough)",
+      {
+        defaultValue: defaults.DEFAULT_SESSION_MODE,
+        required: true,
+        validate: (value) => {
+          const normalized = value.trim().toLowerCase();
+          if (normalized !== "private_translation" && normalized !== "passthrough") {
+            return "must be private_translation or passthrough";
+          }
+          return undefined;
+        },
+      },
+    );
     await promptAndPersist("VOIPMS_DID", "VoIP.ms DID number (optional)", {
       defaultValue: defaults.VOIPMS_DID,
     });
@@ -767,14 +787,29 @@ async function maybePromptEnvMigrations(
 
   const envText = readFileSync(envPath, "utf8");
   const env = parseEnvFile(envText);
-  if (pickNonEmpty(env.TWILIO_VOICE_MODE)) {
-    return;
+  const missing: Array<{ key: string; value: string; message: string }> = [];
+  if (!pickNonEmpty(env.TWILIO_VOICE_MODE)) {
+    missing.push({
+      key: "TWILIO_VOICE_MODE",
+      value: "dial",
+      message: "TWILIO_VOICE_MODE is missing from .env. Add TWILIO_VOICE_MODE=dial now?",
+    });
   }
+  if (!pickNonEmpty(env.DEFAULT_SESSION_MODE)) {
+    missing.push({
+      key: "DEFAULT_SESSION_MODE",
+      value: "private_translation",
+      message:
+        "DEFAULT_SESSION_MODE is missing from .env. Add DEFAULT_SESSION_MODE=private_translation now?",
+    });
+  }
+  if (missing.length === 0) return;
 
-  const message = "TWILIO_VOICE_MODE is missing from .env. Add TWILIO_VOICE_MODE=dial now?";
   const hasTty = process.stdin.isTTY || existsSync("/dev/tty");
   if (!hasTty) {
-    process.stderr.write(`[sandalphone] WARN ${message}\n`);
+    for (const item of missing) {
+      process.stderr.write(`[sandalphone] WARN ${item.message}\n`);
+    }
     process.stderr.write("[sandalphone] run: sandalphone install --env-path .env\n");
     return;
   }
@@ -784,12 +819,14 @@ async function maybePromptEnvMigrations(
     output: process.stdout,
   });
   try {
-    const apply = await promptYesNo(rl, message, true);
-    if (apply) {
-      updateEnvFile(envPath, { TWILIO_VOICE_MODE: "dial" }, context.projectRoot);
-      process.stdout.write(`[sandalphone] updated ${envPath}: TWILIO_VOICE_MODE=dial\n`);
-    } else {
-      process.stderr.write("[sandalphone] WARN continuing with missing TWILIO_VOICE_MODE\n");
+    for (const item of missing) {
+      const apply = await promptYesNo(rl, item.message, true);
+      if (apply) {
+        updateEnvFile(envPath, { [item.key]: item.value }, context.projectRoot);
+        process.stdout.write(`[sandalphone] updated ${envPath}: ${item.key}=${item.value}\n`);
+      } else {
+        process.stderr.write(`[sandalphone] WARN continuing with missing ${item.key}\n`);
+      }
     }
   } finally {
     rl.close();
@@ -1121,6 +1158,52 @@ async function handleSession(args: string[], context: CliContext): Promise<void>
   }
 
   die(`unknown session action: ${action}`);
+}
+
+async function handleMode(args: string[], context: CliContext): Promise<void> {
+  const action = (args[0] ?? "help").toLowerCase();
+  const { flags } = parseFlags(args.slice(1));
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const env = parseEnvFile(envText);
+  const current = (env.DEFAULT_SESSION_MODE ?? "private_translation").trim().toLowerCase();
+
+  if (action === "help") {
+    process.stdout.write("Mode actions:\n");
+    process.stdout.write("  sandalphone mode status [--env-path .env]\n");
+    process.stdout.write("  sandalphone mode translation on [--env-path .env]\n");
+    process.stdout.write("  sandalphone mode translation off [--env-path .env]\n");
+    process.stdout.write("  sandalphone mode translation toggle [--env-path .env]\n");
+    process.stdout.write("\n");
+    return;
+  }
+
+  if (action === "status") {
+    process.stdout.write(`[sandalphone] default_session_mode=${current}\n`);
+    return;
+  }
+
+  if (action !== "translation") {
+    die(`unknown mode action: ${action}`);
+  }
+
+  const toggle = (args[1] ?? "on").toLowerCase();
+  if (toggle !== "on" && toggle !== "off" && toggle !== "toggle") {
+    die("mode translation expects one of: on | off | toggle");
+  }
+
+  let next: "private_translation" | "passthrough";
+  if (toggle === "on") {
+    next = "private_translation";
+  } else if (toggle === "off") {
+    next = "passthrough";
+  } else {
+    next = current === "private_translation" ? "passthrough" : "private_translation";
+  }
+
+  updateEnvFile(envPath, { DEFAULT_SESSION_MODE: next }, context.projectRoot);
+  process.stdout.write(`[sandalphone] default_session_mode=${next}\n`);
+  process.stdout.write("[sandalphone] applies to new calls; existing calls keep their current mode\n");
 }
 
 async function postSessionControl(
@@ -1603,6 +1686,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone urls [--env-path .env] [--base-url https://...]\n`);
   process.stdout.write(`  sandalphone openclaw command --command \"...\" [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session <list|set|passthrough|translation|translate|debug>\n`);
+  process.stdout.write(`  sandalphone mode <status|translation>\n`);
   process.stdout.write(`  sandalphone funnel <action>\n`);
   process.stdout.write(`  sandalphone doctor deploy [--env-path .env]\n`);
   process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);
@@ -1611,6 +1695,7 @@ function printHelp(): void {
   printFunnelHelp();
   printSmokeHelp();
   printSessionHelp();
+  printModeHelp();
   printServiceHelp();
 }
 
@@ -1669,6 +1754,15 @@ function printSessionHelp(): void {
   process.stdout.write(`  sandalphone session translation toggle --session-id ID [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session translate --session-id ID [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session debug --session-id ID [--base-url URL] [--secret SECRET]\n`);
+  process.stdout.write(`\n`);
+}
+
+function printModeHelp(): void {
+  process.stdout.write(`Mode actions:\n`);
+  process.stdout.write(`  sandalphone mode status [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone mode translation on [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone mode translation off [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone mode translation toggle [--env-path .env]\n`);
   process.stdout.write(`\n`);
 }
 

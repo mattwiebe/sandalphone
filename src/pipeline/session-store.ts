@@ -10,7 +10,11 @@ export class SessionStore {
   private readonly sessions = new Map<string, CallSession>();
   private readonly externalToInternal = new Map<string, string>();
 
-  public createFromIncoming(event: IncomingCallEvent, targetPhoneE164: string): CallSession {
+  public createFromIncoming(
+    event: IncomingCallEvent,
+    targetPhoneE164: string,
+    defaultMode: CallSession["mode"] = "private_translation",
+  ): CallSession {
     const id = randomUUID();
     const session: CallSession = {
       id,
@@ -18,7 +22,7 @@ export class SessionStore {
       inboundCaller: event.from,
       startedAtMs: event.receivedAtMs,
       targetPhoneE164,
-      mode: "private_translation",
+      mode: defaultMode,
       sourceLanguage: "es",
       targetLanguage: "en",
       state: "pending",

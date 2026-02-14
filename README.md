@@ -103,6 +103,10 @@ sandalphone session passthrough --session-id <id>
 sandalphone session translation on --session-id <id>
 sandalphone session translation off --session-id <id>
 sandalphone session translation toggle --session-id <id>
+sandalphone mode status
+sandalphone mode translation on
+sandalphone mode translation off
+sandalphone mode translation toggle
 sandalphone session list
 sandalphone session set --session-id <id> --mode passthrough
 sandalphone session debug --session-id <id>
@@ -123,6 +127,7 @@ sandalphone service logs --lines 200
 ```
 
 If exactly one active session exists, session commands auto-select it and `--session-id` is optional.
+Use `sandalphone mode translation on|off|toggle` to set the default for new calls when no session is active.
 
 ## Smoke Test
 With server running on port `8080`:
@@ -193,6 +198,7 @@ If `--to` is omitted, it uses `OUTBOUND_TARGET_E164`. If that is missing, CLI pr
 - dependency install (`npm ci` when lockfile exists)
 - `npm run build`
 - env migration checks (prompts to add missing required keys such as `TWILIO_VOICE_MODE`)
+- env migration checks (prompts to add missing required keys such as `TWILIO_VOICE_MODE` and `DEFAULT_SESSION_MODE`)
 - systemd restart on Linux when `sandalphone-vps-gateway.service` exists
 
 Use `--no-restart` to skip service restart.
@@ -395,6 +401,7 @@ Alternative locator:
 ## Env
 - `PORT` (default `8080`)
 - `OUTBOUND_TARGET_E164` (default `+15555550100`)
+- `DEFAULT_SESSION_MODE` (`private_translation` or `passthrough`; default `private_translation`)
 - `TWILIO_ACCOUNT_SID` (required for `sandalphone smoke outbound`)
 - `TWILIO_PHONE_NUMBER` (optional metadata for your Twilio DID)
 - `VOIPMS_DID` (optional metadata for your VoIP.ms DID)

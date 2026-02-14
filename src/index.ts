@@ -29,6 +29,7 @@ function main(): void {
     translator: providers.translator,
     tts: providers.tts,
     outboundTargetE164: config.outboundTargetE164,
+    defaultSessionMode: config.defaultSessionMode,
     minFrameIntervalMs: config.pipelineMinFrameIntervalMs,
     onTtsChunk: (chunk) => {
       const enqueue = egressStore.enqueue(chunk);
