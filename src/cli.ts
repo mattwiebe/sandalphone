@@ -880,6 +880,9 @@ function handleSmoke(args: string[], context: CliContext): void {
         if (parsed.TWILIO_VOICE_MODE) {
           env.TWILIO_VOICE_MODE = parsed.TWILIO_VOICE_MODE;
         }
+        if (parsed.OUTBOUND_TARGET_E164) {
+          env.OUTBOUND_TARGET_E164 = parsed.OUTBOUND_TARGET_E164;
+        }
       }
     }
     if (flags["strict-egress"] === "1" || flags["strict-egress"] === "true") {

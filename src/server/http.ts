@@ -281,12 +281,30 @@ export function startHttpServer(
         const voiceMode = opts.twilioVoiceMode ?? "dial";
         let twiml = result.twiml;
         if (voiceMode === "stream") {
-          const streamWsUrl = resolveTwilioStreamWsUrl(opts.twilioStreamWsUrl, opts.publicBaseUrl);
-          if (streamWsUrl) {
-            twiml = buildTwimlForStream(streamWsUrl);
+          const session = orchestrator.getSession(result.sessionId);
+          const from = body.From ?? "unknown";
+          const streamEligible = session
+            ? normalizePhoneForCompare(from) === normalizePhoneForCompare(session.targetPhoneE164)
+            : false;
+          if (streamEligible) {
+            const streamWsUrl = resolveTwilioStreamWsUrl(opts.twilioStreamWsUrl, opts.publicBaseUrl);
+            if (streamWsUrl) {
+              twiml = buildTwimlForStream(streamWsUrl);
+              logger.info("twilio stream mode engaged for trusted caller", {
+                callSid: body.CallSid ?? "unknown",
+                from,
+                target: session?.targetPhoneE164 ?? "unknown",
+              });
+            } else {
+              logger.warn("twilio stream mode requested without stream URL; falling back to dial", {
+                callSid: body.CallSid ?? "unknown",
+              });
+            }
           } else {
-            logger.warn("twilio stream mode requested without stream URL; falling back to dial", {
+            logger.info("twilio stream mode skipped; caller is not trusted stream controller", {
               callSid: body.CallSid ?? "unknown",
+              from,
+              expectedFrom: session?.targetPhoneE164 ?? "unknown",
             });
           }
         }
@@ -505,4 +523,8 @@ function resolveTwilioStreamWsUrl(
     return `ws://${base.slice("http://".length).replace(/\/+$/, "")}/twilio/stream`;
   }
   return undefined;
+}
+
+function normalizePhoneForCompare(raw: string): string {
+  return raw.replace(/\D/g, "");
 }

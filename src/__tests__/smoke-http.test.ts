@@ -170,7 +170,7 @@ test("smoke: twilio voice endpoint can return stream TwiML", async () => {
     const twilio = await fetch(`${app.baseUrl}/twilio/voice`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: "CallSid=CA_TEST_STREAM&From=%2B15551234567&To=%2B18005550199",
+      body: "CallSid=CA_TEST_STREAM&From=%2B15555550100&To=%2B18005550199",
     });
     assert.equal(twilio.status, 200);
     const twiml = await twilio.text();
@@ -191,7 +191,7 @@ test("smoke: twilio stream mode falls back to dial when no stream URL is availab
     const twilio = await fetch(`${app.baseUrl}/twilio/voice`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: "CallSid=CA_TEST_STREAM_FALLBACK&From=%2B15551234567&To=%2B18005550199",
+      body: "CallSid=CA_TEST_STREAM_FALLBACK&From=%2B15555550100&To=%2B18005550199",
     });
     assert.equal(twilio.status, 200);
     const twiml = await twilio.text();

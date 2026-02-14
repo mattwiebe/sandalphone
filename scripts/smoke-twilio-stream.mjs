@@ -52,6 +52,7 @@ async function run() {
   const expectedMode = resolveValue("TWILIO_VOICE_MODE", "dial").toLowerCase();
   const expectedWsOverride = resolveValue("TWILIO_STREAM_WS_URL");
   const publicBaseUrl = resolveValue("PUBLIC_BASE_URL");
+  const trustedCaller = resolveValue("OUTBOUND_TARGET_E164", "+15555550100");
   const twilioAuthToken = resolveValue("TWILIO_AUTH_TOKEN");
   const expectedWsUrl =
     expectedWsOverride ||
@@ -68,7 +69,7 @@ async function run() {
 
   const formFields = {
     CallSid: "CA_STREAM_SMOKE",
-    From: "+15551234567",
+    From: trustedCaller,
     To: "+18005550199",
   };
   const twilioHeaders = { "content-type": "application/x-www-form-urlencoded" };

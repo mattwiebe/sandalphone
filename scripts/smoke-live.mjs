@@ -7,6 +7,9 @@ const strictEgress = process.env.STRICT_EGRESS === "1";
 const source = process.env.SMOKE_SOURCE ?? "voipms";
 const callId = process.env.SMOKE_CALL_ID ?? `sip-live-${Date.now()}`;
 const twilioVoiceMode = (process.env.TWILIO_VOICE_MODE ?? "dial").toLowerCase();
+const simulatedTwilioFrom =
+  process.env.SMOKE_TWILIO_FROM ??
+  (twilioVoiceMode === "stream" ? process.env.OUTBOUND_TARGET_E164 ?? "+15551234567" : "+15551234567");
 
 function log(step, detail) {
   const suffix = detail ? ` ${detail}` : "";
@@ -47,7 +50,11 @@ async function run() {
   const twilio = await fetch(`${baseUrl}/twilio/voice`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: "CallSid=CA_LIVE_SMOKE&From=%2B15551234567&To=%2B18005550199",
+    body: new URLSearchParams({
+      CallSid: "CA_LIVE_SMOKE",
+      From: simulatedTwilioFrom,
+      To: "+18005550199",
+    }),
   });
   if (!twilio.ok) throw new Error(`/twilio/voice returned ${twilio.status}`);
   const twiml = await twilio.text();
