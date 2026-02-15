@@ -39,6 +39,18 @@ type CommandResult = {
   timedOut?: boolean;
 };
 
+type AsteriskSetupOptions = {
+  endpointName: string;
+  contextName: string;
+  bindIp: string;
+  sipPort: number;
+  rtpStart: number;
+  rtpEnd: number;
+  matchCidr: string;
+  testPromptFile: string;
+  autoInstall: boolean;
+};
+
 type SessionSummary = {
   id: string;
   state: string;
@@ -118,6 +130,10 @@ async function main(argv: string[]): Promise<void> {
     }
     case "service": {
       handleService(rest, context);
+      return;
+    }
+    case "setup-asterisk": {
+      handleSetupAsterisk(rest, context);
       return;
     }
     case "funnel": {
@@ -407,6 +423,19 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       }
     }
 
+    const configuredSipUri = pickNonEmpty(updates.TWILIO_UNTRUSTED_SIP_URI);
+    if (!configuredSipUri) {
+      const inferred = inferTwilioUntrustedSipUri(
+        updates.PUBLIC_BASE_URL ?? "",
+        "twilio-in",
+        5060,
+      );
+      if (inferred) {
+        persist("TWILIO_UNTRUSTED_SIP_URI", inferred);
+        process.stdout.write(`[sandalphone] inferred TWILIO_UNTRUSTED_SIP_URI=${inferred}\n`);
+      }
+    }
+
     const twilioVoiceMode = (updates.TWILIO_VOICE_MODE ?? "dial").trim().toLowerCase();
     const hasStreamUrl = (updates.TWILIO_STREAM_WS_URL ?? "").trim().length > 0;
     const hasPublicBaseUrl = (updates.PUBLIC_BASE_URL ?? "").trim().length > 0;
@@ -458,6 +487,35 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
     process.stdout.write(`  ${step}. Start service locally and run smoke:\n`);
     process.stdout.write("     - node dist/index.js\n");
     process.stdout.write(`     - sandalphone smoke live --base-url ${base}\n`);
+    step += 1;
+    process.stdout.write(`  ${step}. Optional: provision Asterisk SIP ingress for Twilio untrusted handoff:\n`);
+    process.stdout.write("     - sudo sandalphone setup-asterisk\n");
+
+    const setupAsteriskNow = await promptYesNo(
+      rl,
+      "Set up Asterisk now (requires sudo/root on Linux host)?",
+      false,
+    );
+    if (setupAsteriskNow) {
+      if (platform() !== "linux") {
+        process.stderr.write("[sandalphone] WARN setup-asterisk is currently Linux-only\n");
+      } else if (typeof process.getuid === "function" && process.getuid() === 0) {
+        runAsteriskSetup({
+          endpointName: "twilio-in",
+          contextName: "from-twilio",
+          bindIp: "0.0.0.0",
+          sipPort: 5060,
+          rtpStart: 10000,
+          rtpEnd: 20000,
+          matchCidr: "0.0.0.0/0",
+          testPromptFile: "hello-world",
+          autoInstall: true,
+        });
+      } else {
+        process.stderr.write("[sandalphone] setup-asterisk needs root privileges\n");
+        process.stderr.write("[sandalphone] run: sudo sandalphone setup-asterisk\n");
+      }
+    }
   } finally {
     rl.close();
   }
@@ -1533,6 +1591,146 @@ function handleService(args: string[], context: CliContext): void {
   die(`unknown service action: ${action}`);
 }
 
+function handleSetupAsterisk(args: string[], context: CliContext): void {
+  if (platform() !== "linux") {
+    die("setup-asterisk is currently Linux-only");
+  }
+  if (typeof process.getuid !== "function" || process.getuid() !== 0) {
+    die("setup-asterisk must run as root (use: sudo sandalphone setup-asterisk)");
+  }
+
+  const { flags } = parseFlags(args);
+  const endpointName = flags["endpoint-name"] ?? "twilio-in";
+  const contextName = flags.context ?? "from-twilio";
+  const bindIp = flags["bind-ip"] ?? "0.0.0.0";
+  const sipPort = Number(flags["sip-port"] ?? "5060");
+  const rtpStart = Number(flags["rtp-start"] ?? "10000");
+  const rtpEnd = Number(flags["rtp-end"] ?? "20000");
+  const matchCidr = flags["match-cidr"] ?? "0.0.0.0/0";
+  const testPromptFile = flags["test-prompt"] ?? "hello-world";
+  const autoInstall = flags["no-install"] !== "1" && flags["no-install"] !== "true";
+
+  runAsteriskSetup({
+    endpointName,
+    contextName,
+    bindIp,
+    sipPort,
+    rtpStart,
+    rtpEnd,
+    matchCidr,
+    testPromptFile,
+    autoInstall,
+  });
+
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const env = parseEnvFile(envText);
+  if (!pickNonEmpty(env.TWILIO_UNTRUSTED_SIP_URI)) {
+    const inferred = inferTwilioUntrustedSipUri(env.PUBLIC_BASE_URL ?? "", endpointName, sipPort);
+    if (inferred) {
+      updateEnvFile(envPath, { TWILIO_UNTRUSTED_SIP_URI: inferred }, context.projectRoot);
+      process.stdout.write(`[sandalphone] updated ${envPath}: TWILIO_UNTRUSTED_SIP_URI=${inferred}\n`);
+    } else {
+      process.stdout.write(
+        "[sandalphone] set TWILIO_UNTRUSTED_SIP_URI manually (e.g. sip:twilio-in@your-host:5060)\n",
+      );
+    }
+  }
+}
+
+function runAsteriskSetup(options: AsteriskSetupOptions): void {
+  const pjsipInclude = "/etc/asterisk/pjsip_sandalphone.conf";
+  const extensionsInclude = "/etc/asterisk/extensions_sandalphone.conf";
+  const pjsipMain = "/etc/asterisk/pjsip.conf";
+  const extensionsMain = "/etc/asterisk/extensions.conf";
+  const rtpConf = "/etc/asterisk/rtp.conf";
+
+  if (options.autoInstall) {
+    process.stdout.write("[sandalphone] setup-asterisk: apt-get install asterisk\n");
+    runCommandCapture("apt-get", ["update", "-y"]);
+    runCommandChecked("apt-get", ["install", "-y", "asterisk"]);
+  }
+
+  const pjsipText = [
+    `; managed by sandalphone setup-asterisk`,
+    `[transport-udp]`,
+    `type=transport`,
+    `protocol=udp`,
+    `bind=${options.bindIp}:${options.sipPort}`,
+    ``,
+    `[${options.endpointName}]`,
+    `type=endpoint`,
+    `context=${options.contextName}`,
+    `disallow=all`,
+    `allow=ulaw`,
+    `direct_media=no`,
+    ``,
+    `[${options.endpointName}]`,
+    `type=aor`,
+    `max_contacts=1`,
+    ``,
+    `[${options.endpointName}]`,
+    `type=identify`,
+    `endpoint=${options.endpointName}`,
+    `match=${options.matchCidr}`,
+    ``,
+  ].join("\n");
+  writeFileSync(pjsipInclude, pjsipText, "utf8");
+  ensureIncludeDirective(pjsipMain, "#include pjsip_sandalphone.conf");
+
+  const extensionsText = [
+    `; managed by sandalphone setup-asterisk`,
+    `[${options.contextName}]`,
+    `exten => s,1,NoOp(Sandalphone Twilio inbound reached Asterisk)`,
+    ` same => n,Answer()`,
+    ` same => n,Playback(${options.testPromptFile})`,
+    ` same => n,Hangup()`,
+    ``,
+  ].join("\n");
+  writeFileSync(extensionsInclude, extensionsText, "utf8");
+  ensureIncludeDirective(extensionsMain, "#include extensions_sandalphone.conf");
+
+  writeFileSync(
+    rtpConf,
+    [
+      `[general]`,
+      `rtpstart=${options.rtpStart}`,
+      `rtpend=${options.rtpEnd}`,
+      ``,
+    ].join("\n"),
+    "utf8",
+  );
+
+  runCommandCapture("ufw", ["allow", `${options.sipPort}/udp`]);
+  runCommandCapture("ufw", ["allow", `${options.rtpStart}:${options.rtpEnd}/udp`]);
+  runCommandChecked("systemctl", ["restart", "asterisk"]);
+  runCommandCapture("asterisk", ["-rx", "pjsip reload"]);
+
+  process.stdout.write("[sandalphone] setup-asterisk complete\n");
+}
+
+function ensureIncludeDirective(path: string, includeLine: string): void {
+  const text = existsSync(path) ? readFileSync(path, "utf8") : "";
+  if (text.includes(includeLine)) return;
+  const next = `${text.trimEnd()}\n${includeLine}\n`;
+  writeFileSync(path, next, "utf8");
+}
+
+function inferTwilioUntrustedSipUri(
+  publicBaseUrl: string,
+  endpointName: string,
+  sipPort: number,
+): string | undefined {
+  const trimmed = publicBaseUrl.trim();
+  if (!trimmed) return undefined;
+  try {
+    const host = new URL(trimmed).host;
+    return `sip:${endpointName}@${host.replace(/:\d+$/, "")}:${sipPort}`;
+  } catch {
+    return undefined;
+  }
+}
+
 function parseFlags(args: string[]): { flags: Record<string, string>; extras: string[] } {
   const flags: Record<string, string> = {};
   const extras: string[] = [];
@@ -1734,6 +1932,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone openclaw command --command \"...\" [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session <list|set|passthrough|translation|translate|debug>\n`);
   process.stdout.write(`  sandalphone mode <status|translation>\n`);
+  process.stdout.write(`  sandalphone setup-asterisk [--env-path .env]\n`);
   process.stdout.write(`  sandalphone funnel <action>\n`);
   process.stdout.write(`  sandalphone doctor deploy [--env-path .env]\n`);
   process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);

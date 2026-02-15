@@ -109,6 +109,7 @@ sandalphone mode status
 sandalphone mode translation on
 sandalphone mode translation off
 sandalphone mode translation toggle
+sandalphone setup-asterisk
 sandalphone session list
 sandalphone session set --session-id <id> --mode passthrough
 sandalphone session debug --session-id <id>
@@ -205,6 +206,20 @@ If `--to` is omitted, it uses `OUTBOUND_TARGET_E164`. If that is missing, CLI pr
 - systemd restart on Linux when `sandalphone-vps-gateway.service` exists
 
 Use `--no-restart` to skip service restart.
+
+### Asterisk Setup Automation
+Provision baseline Asterisk SIP ingress on Linux VPS:
+
+```bash
+sudo sandalphone setup-asterisk
+```
+
+This command:
+- installs Asterisk (unless `--no-install`)
+- writes managed `pjsip` + `extensions` include files
+- opens SIP/RTP firewall rules via `ufw` (best-effort)
+- restarts and reloads Asterisk
+- infers and writes `TWILIO_UNTRUSTED_SIP_URI` when possible
 
 ### Tailscale Funnel Commands
 Manage local public ingress from CLI:
