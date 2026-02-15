@@ -1696,6 +1696,8 @@ function runAsteriskSetup(options: AsteriskSetupOptions): void {
     ` same => n,Answer()`,
     ` same => n,Playback(${options.testPromptFile})`,
     ` same => n,Hangup()`,
+    `exten => h,1,NoOp(Sandalphone Twilio hangup handler)`,
+    ` same => n,Hangup()`,
     ``,
   ].join("\n");
   writeFileSync(extensionsInclude, extensionsText, "utf8");
