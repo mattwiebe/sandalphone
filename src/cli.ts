@@ -1609,6 +1609,7 @@ function handleSetupAsterisk(args: string[], context: CliContext): void {
   const matchCidr = flags["match-cidr"] ?? "0.0.0.0/0";
   const testPromptFile = flags["test-prompt"] ?? "hello-world";
   const autoInstall = flags["no-install"] !== "1" && flags["no-install"] !== "true";
+  const publicHostOverride = flags["public-host"]?.trim();
 
   runAsteriskSetup({
     endpointName,
@@ -1625,14 +1626,22 @@ function handleSetupAsterisk(args: string[], context: CliContext): void {
   const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
   const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
   const env = parseEnvFile(envText);
-  if (!pickNonEmpty(env.TWILIO_UNTRUSTED_SIP_URI)) {
-    const inferred = inferTwilioUntrustedSipUri(env.PUBLIC_BASE_URL ?? "", endpointName, sipPort);
+  const existingSipUri = pickNonEmpty(env.TWILIO_UNTRUSTED_SIP_URI);
+  const existingIsTailscale = existingSipUri?.includes(".ts.net") ?? false;
+  if (!existingSipUri || existingIsTailscale || publicHostOverride) {
+    const inferred = inferTwilioUntrustedSipUri(
+      env.PUBLIC_BASE_URL ?? "",
+      endpointName,
+      sipPort,
+      publicHostOverride,
+    );
     if (inferred) {
       updateEnvFile(envPath, { TWILIO_UNTRUSTED_SIP_URI: inferred }, context.projectRoot);
       process.stdout.write(`[sandalphone] updated ${envPath}: TWILIO_UNTRUSTED_SIP_URI=${inferred}\n`);
     } else {
+      process.stdout.write("[sandalphone] could not auto-detect public SIP host\n");
       process.stdout.write(
-        "[sandalphone] set TWILIO_UNTRUSTED_SIP_URI manually (e.g. sip:twilio-in@your-host:5060)\n",
+        "[sandalphone] rerun with --public-host <public-ip-or-domain> or set TWILIO_UNTRUSTED_SIP_URI manually\n",
       );
     }
   }
@@ -1720,15 +1729,62 @@ function inferTwilioUntrustedSipUri(
   publicBaseUrl: string,
   endpointName: string,
   sipPort: number,
+  publicHostOverride?: string,
 ): string | undefined {
+  const explicit = publicHostOverride?.trim();
+  if (explicit) {
+    return `sip:${endpointName}@${explicit.replace(/:\d+$/, "")}:${sipPort}`;
+  }
+
   const trimmed = publicBaseUrl.trim();
   if (!trimmed) return undefined;
   try {
-    const host = new URL(trimmed).host;
-    return `sip:${endpointName}@${host.replace(/:\d+$/, "")}:${sipPort}`;
+    const host = new URL(trimmed).hostname;
+    // Tailscale hostnames are not reachable by Twilio SIP.
+    if (host.endsWith(".ts.net")) {
+      const discovered = discoverPublicSipHost();
+      if (!discovered) return undefined;
+      return `sip:${endpointName}@${discovered}:${sipPort}`;
+    }
+    return `sip:${endpointName}@${host}:${sipPort}`;
   } catch {
-    return undefined;
+    const discovered = discoverPublicSipHost();
+    if (!discovered) return undefined;
+    return `sip:${endpointName}@${discovered}:${sipPort}`;
   }
+}
+
+function discoverPublicSipHost(): string | undefined {
+  const fromCurl = runCommandCapture("curl", ["-4fsS", "--max-time", "4", "https://api.ipify.org"]);
+  if (fromCurl.status === 0) {
+    const ip = fromCurl.stdout.trim();
+    if (isPublicIpv4(ip)) return ip;
+  }
+
+  const fromHostname = runCommandCapture("hostname", ["-I"]);
+  if (fromHostname.status === 0) {
+    const candidates = fromHostname.stdout
+      .trim()
+      .split(/\s+/)
+      .map((value) => value.trim())
+      .filter((value) => isPublicIpv4(value));
+    if (candidates.length > 0) return candidates[0];
+  }
+
+  return undefined;
+}
+
+function isPublicIpv4(value: string): boolean {
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(value)) return false;
+  const parts = value.split(".").map((v) => Number(v));
+  if (parts.some((n) => !Number.isFinite(n) || n < 0 || n > 255)) return false;
+  if (parts[0] === 10) return false;
+  if (parts[0] === 127) return false;
+  if (parts[0] === 0) return false;
+  if (parts[0] === 169 && parts[1] === 254) return false;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
+  if (parts[0] === 192 && parts[1] === 168) return false;
+  return true;
 }
 
 function parseFlags(args: string[]): { flags: Record<string, string>; extras: string[] } {

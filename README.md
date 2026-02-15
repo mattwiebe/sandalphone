@@ -219,7 +219,7 @@ This command:
 - writes managed `pjsip` + `extensions` include files
 - opens SIP/RTP firewall rules via `ufw` (best-effort)
 - restarts and reloads Asterisk
-- infers and writes `TWILIO_UNTRUSTED_SIP_URI` when possible
+- infers and writes `TWILIO_UNTRUSTED_SIP_URI` using a public host/IP (avoids `.ts.net`); rerun with `--public-host` to force host selection
 
 ### Tailscale Funnel Commands
 Manage local public ingress from CLI:
