@@ -36,6 +36,17 @@ export function buildTwimlForBridgeWithStream(
   ].join("\n");
 }
 
+export function buildTwimlForSipBridge(sipUri: string): string {
+  return [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+    "<Response>",
+    "  <Dial>",
+    `    <Sip>${escapeXml(sipUri)}</Sip>`,
+    "  </Dial>",
+    "</Response>",
+  ].join("\n");
+}
+
 export function buildTwimlForStream(streamWsUrl: string): string {
   return [
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",

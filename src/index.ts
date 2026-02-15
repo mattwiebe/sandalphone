@@ -48,6 +48,7 @@ function main(): void {
     publicBaseUrl: config.publicBaseUrl,
     twilioVoiceMode: config.twilioVoiceMode,
     twilioStreamWsUrl: config.twilioStreamWsUrl,
+    twilioUntrustedSipUri: config.twilioUntrustedSipUri,
     controlApiSecret: config.controlApiSecret,
     openClawBridge,
   });

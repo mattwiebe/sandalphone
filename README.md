@@ -227,6 +227,7 @@ Use stream mode to feed Twilio audio into the translation pipeline:
 - In stream mode:
   - calls from `OUTBOUND_TARGET_E164` engage `<Connect><Stream>` (controller path)
   - all other callers use `<Start><Stream>` + `<Dial>` (forward + stream fork)
+  - set `TWILIO_UNTRUSTED_SIP_URI=sip:...` to hand untrusted callers to your SIP/Asterisk bridge instead
 
 Validate stream TwiML quickly:
 
@@ -424,6 +425,7 @@ Alternative locator:
 - `PUBLIC_BASE_URL` (optional override for signature URL, e.g. `https://voice.yourdomain.com`)
 - `TWILIO_VOICE_MODE` (`dial` or `stream`; default `dial`)
 - `TWILIO_STREAM_WS_URL` (optional explicit stream websocket URL; when empty derives from `PUBLIC_BASE_URL` as `/twilio/stream`)
+- `TWILIO_UNTRUSTED_SIP_URI` (optional SIP URI for untrusted inbound handoff when stream mode is enabled)
 - `OPENCLAW_BRIDGE_URL` (optional HTTP endpoint for call/session events and command relay)
 - `OPENCLAW_BRIDGE_API_KEY` (optional bearer token for bridge endpoint)
 - `OPENCLAW_BRIDGE_TIMEOUT_MS` (default `1200`)

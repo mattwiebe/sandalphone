@@ -178,6 +178,7 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       TWILIO_AUTH_TOKEN: currentValues.TWILIO_AUTH_TOKEN ?? "",
       TWILIO_VOICE_MODE: currentValues.TWILIO_VOICE_MODE ?? "dial",
       TWILIO_STREAM_WS_URL: currentValues.TWILIO_STREAM_WS_URL ?? "",
+      TWILIO_UNTRUSTED_SIP_URI: currentValues.TWILIO_UNTRUSTED_SIP_URI ?? "",
       GOOGLE_CLOUD_API_KEY:
         currentValues.GOOGLE_CLOUD_API_KEY ??
         currentValues.GOOGLE_TTS_API_KEY ??
@@ -282,6 +283,13 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
           }
           return undefined;
         },
+      },
+    );
+    await promptAndPersist(
+      "TWILIO_UNTRUSTED_SIP_URI",
+      "Twilio untrusted SIP handoff URI (optional, e.g. sip:bridge@your-asterisk-host)",
+      {
+        defaultValue: defaults.TWILIO_UNTRUSTED_SIP_URI,
       },
     );
     await promptAndPersist("TWILIO_PHONE_NUMBER", "Twilio DID number (optional)", {

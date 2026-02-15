@@ -66,6 +66,7 @@ async function startSmokeApp(opts?: {
   twilioVoiceMode?: "dial" | "stream";
   publicBaseUrl?: string;
   twilioStreamWsUrl?: string;
+  twilioUntrustedSipUri?: string;
 }): Promise<RunningApp> {
   const logger = makeLogger("error");
   const egressStore = new EgressStore(16);
@@ -116,6 +117,7 @@ async function startSmokeApp(opts?: {
     twilioVoiceMode: opts?.twilioVoiceMode,
     publicBaseUrl: opts?.publicBaseUrl,
     twilioStreamWsUrl: opts?.twilioStreamWsUrl,
+    twilioUntrustedSipUri: opts?.twilioUntrustedSipUri,
     openClawBridge,
   });
   await once(server, "listening");
@@ -219,6 +221,28 @@ test("smoke: twilio stream mode forks stream for untrusted caller while still di
     assert.equal(twiml.includes("<Stream"), true);
     assert.equal(twiml.includes("<Dial>"), true);
     assert.equal(twiml.includes("track=\"both_tracks\""), true);
+  } finally {
+    await app.stop();
+  }
+});
+
+test("smoke: twilio stream mode can hand off untrusted caller to sip bridge", async () => {
+  const app = await startSmokeApp({
+    twilioVoiceMode: "stream",
+    publicBaseUrl: "https://voice.example.com",
+    twilioUntrustedSipUri: "sip:bridge@example.com",
+  });
+  try {
+    const twilio = await fetch(`${app.baseUrl}/twilio/voice`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "CallSid=CA_TEST_STREAM_SIP&From=%2B15551234567&To=%2B18005550199",
+    });
+    assert.equal(twilio.status, 200);
+    const twiml = await twilio.text();
+    assert.equal(twiml.includes("<Sip>sip:bridge@example.com</Sip>"), true);
+    assert.equal(twiml.includes("<Dial>"), true);
+    assert.equal(twiml.includes("<Start>"), false);
   } finally {
     await app.stop();
   }

@@ -14,6 +14,7 @@ export interface AppConfig {
   readonly publicBaseUrl?: string;
   readonly twilioVoiceMode: "dial" | "stream";
   readonly twilioStreamWsUrl?: string;
+  readonly twilioUntrustedSipUri?: string;
   readonly controlApiSecret?: string;
   readonly openClawBridgeUrl?: string;
   readonly openClawBridgeApiKey?: string;
@@ -71,6 +72,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     publicBaseUrl: env.PUBLIC_BASE_URL,
     twilioVoiceMode: twilioVoiceModeRaw as "dial" | "stream",
     twilioStreamWsUrl: env.TWILIO_STREAM_WS_URL,
+    twilioUntrustedSipUri: env.TWILIO_UNTRUSTED_SIP_URI,
     controlApiSecret: env.CONTROL_API_SECRET,
     openClawBridgeUrl: env.OPENCLAW_BRIDGE_URL,
     openClawBridgeApiKey: env.OPENCLAW_BRIDGE_API_KEY,

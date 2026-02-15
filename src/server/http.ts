@@ -5,6 +5,7 @@ import { WebSocketServer } from "ws";
 import type { VoiceOrchestrator } from "../pipeline/orchestrator.js";
 import {
   buildTwimlForBridgeWithStream,
+  buildTwimlForSipBridge,
   buildTwimlForStream,
   buildTwimlSayAndHangup,
   handleTwilioInbound,
@@ -64,6 +65,7 @@ export function startHttpServer(
     readonly publicBaseUrl?: string;
     readonly twilioVoiceMode?: "dial" | "stream";
     readonly twilioStreamWsUrl?: string;
+    readonly twilioUntrustedSipUri?: string;
     readonly controlApiSecret?: string;
     readonly openClawBridge?: OpenClawBridge;
   },
@@ -306,16 +308,24 @@ export function startHttpServer(
               });
             }
           } else {
-            if (streamWsUrl && session?.targetPhoneE164) {
-              twiml = buildTwimlForBridgeWithStream(
-                session.targetPhoneE164,
-                streamWsUrl,
-              );
-              logger.info("twilio stream fork engaged for untrusted caller (dial + stream)", {
+            const sipUri = opts.twilioUntrustedSipUri?.trim();
+            if (sipUri) {
+              twiml = buildTwimlForSipBridge(sipUri);
+              logger.info("twilio untrusted caller handed off to sip bridge", {
                 callSid: body.CallSid ?? "unknown",
                 from,
-                expectedFrom: session?.targetPhoneE164 ?? "unknown",
+                sipUri,
               });
+            } else if (streamWsUrl && session?.targetPhoneE164) {
+                twiml = buildTwimlForBridgeWithStream(
+                  session.targetPhoneE164,
+                  streamWsUrl,
+                );
+                logger.info("twilio stream fork engaged for untrusted caller (dial + stream)", {
+                  callSid: body.CallSid ?? "unknown",
+                  from,
+                  expectedFrom: session?.targetPhoneE164 ?? "unknown",
+                });
             } else {
               logger.info("twilio stream mode skipped; missing stream URL or target for untrusted caller", {
                 callSid: body.CallSid ?? "unknown",
