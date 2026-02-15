@@ -1690,6 +1690,8 @@ function runAsteriskSetup(options: AsteriskSetupOptions): void {
   const extensionsText = [
     `; managed by sandalphone setup-asterisk`,
     `[${options.contextName}]`,
+    `exten => ${options.endpointName},1,Goto(s,1)`,
+    `exten => _.,1,Goto(s,1)`,
     `exten => s,1,NoOp(Sandalphone Twilio inbound reached Asterisk)`,
     ` same => n,Answer()`,
     ` same => n,Playback(${options.testPromptFile})`,
