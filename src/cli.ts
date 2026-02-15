@@ -69,6 +69,13 @@ type SessionSummary = {
   targetPhoneE164?: string;
 };
 
+function defaultAsteriskOutboundDialString(
+  outboundTargetE164: string,
+  endpointName = "twilio-out",
+): string {
+  return `PJSIP/${outboundTargetE164}@${endpointName}`;
+}
+
 function pickNonEmpty(...values: Array<string | undefined>): string | undefined {
   for (const value of values) {
     if (value && value.trim().length > 0) return value;
@@ -191,6 +198,9 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       PUBLIC_BASE_URL: currentValues.PUBLIC_BASE_URL ?? "",
       OUTBOUND_TARGET_E164:
         currentValues.OUTBOUND_TARGET_E164 ?? "+15555550100",
+      ASTERISK_OUTBOUND_DIAL_STRING:
+        currentValues.ASTERISK_OUTBOUND_DIAL_STRING ??
+        defaultAsteriskOutboundDialString(currentValues.OUTBOUND_TARGET_E164 ?? "+15555550100"),
       TWILIO_ACCOUNT_SID: currentValues.TWILIO_ACCOUNT_SID ?? "",
       TWILIO_PHONE_NUMBER: currentValues.TWILIO_PHONE_NUMBER ?? "",
       VOIPMS_DID: currentValues.VOIPMS_DID ?? "",
@@ -199,6 +209,11 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       CONTROL_API_SECRET:
         pickNonEmpty(currentValues.CONTROL_API_SECRET) ?? randomBytes(16).toString("hex"),
       TWILIO_AUTH_TOKEN: currentValues.TWILIO_AUTH_TOKEN ?? "",
+      TWILIO_SIP_TRUNK_HOST: currentValues.TWILIO_SIP_TRUNK_HOST ?? "",
+      TWILIO_SIP_AUTH_USERNAME:
+        currentValues.TWILIO_SIP_AUTH_USERNAME ?? currentValues.TWILIO_ACCOUNT_SID ?? "",
+      TWILIO_SIP_AUTH_PASSWORD:
+        currentValues.TWILIO_SIP_AUTH_PASSWORD ?? currentValues.TWILIO_AUTH_TOKEN ?? "",
       TWILIO_VOICE_MODE: currentValues.TWILIO_VOICE_MODE ?? "dial",
       TWILIO_STREAM_WS_URL: currentValues.TWILIO_STREAM_WS_URL ?? "",
       TWILIO_UNTRUSTED_SIP_URI: currentValues.TWILIO_UNTRUSTED_SIP_URI ?? "",
@@ -270,7 +285,10 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       "[sandalphone] outbound bridge target = the phone number Sandalphone dials (usually your phone), not your Twilio/VoIP.ms managed DID\n",
     );
 
-    await promptAndPersist("OUTBOUND_TARGET_E164", "Outbound bridge target phone (E.164)", {
+    const outboundTargetE164 = await promptAndPersist(
+      "OUTBOUND_TARGET_E164",
+      "Outbound bridge target phone (E.164)",
+      {
       defaultValue: defaults.OUTBOUND_TARGET_E164,
       required: true,
       validate: (value) => {
@@ -279,6 +297,12 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         }
         return undefined;
       },
+      },
+    );
+    const defaultDialString = defaultAsteriskOutboundDialString(outboundTargetE164);
+    await promptAndPersist("ASTERISK_OUTBOUND_DIAL_STRING", "Asterisk outbound dial string", {
+      defaultValue: currentValues.ASTERISK_OUTBOUND_DIAL_STRING ?? defaultDialString,
+      required: true,
     });
     await promptAndPersist("PUBLIC_BASE_URL", "Public base URL (for Twilio signature checks)", {
       defaultValue: detectedPublicBaseUrl || defaults.PUBLIC_BASE_URL,
@@ -368,6 +392,16 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         required: (updates.TWILIO_PHONE_NUMBER ?? "").trim().length > 0,
       },
     );
+    await promptAndPersist("TWILIO_SIP_TRUNK_HOST", "Twilio SIP trunk host (for Asterisk bridge)", {
+      defaultValue: defaults.TWILIO_SIP_TRUNK_HOST,
+    });
+    await promptAndPersist("TWILIO_SIP_AUTH_USERNAME", "Twilio SIP auth username", {
+      defaultValue: defaults.TWILIO_SIP_AUTH_USERNAME,
+    });
+    await promptAndPersist("TWILIO_SIP_AUTH_PASSWORD", "Twilio SIP auth password", {
+      defaultValue: defaults.TWILIO_SIP_AUTH_PASSWORD,
+      secret: true,
+    });
     await promptWithHelpAndPersist(
       "GOOGLE_CLOUD_API_KEY",
       "Google Cloud API key (Speech-to-Text + Text-to-Speech + Translate)",
@@ -894,6 +928,15 @@ async function maybePromptEnvMigrations(
         "DEFAULT_SESSION_MODE is missing from .env. Add DEFAULT_SESSION_MODE=private_translation now?",
     });
   }
+  const outboundTarget = pickNonEmpty(env.OUTBOUND_TARGET_E164);
+  if (!pickNonEmpty(env.ASTERISK_OUTBOUND_DIAL_STRING) && outboundTarget) {
+    const fallback = defaultAsteriskOutboundDialString(outboundTarget);
+    missing.push({
+      key: "ASTERISK_OUTBOUND_DIAL_STRING",
+      value: fallback,
+      message: `ASTERISK_OUTBOUND_DIAL_STRING is missing from .env. Add ASTERISK_OUTBOUND_DIAL_STRING=${fallback} now?`,
+    });
+  }
   if (missing.length === 0) return;
 
   const hasTty = process.stdin.isTTY || existsSync("/dev/tty");
@@ -1059,6 +1102,7 @@ function handleUrls(args: string[], context: CliContext): void {
   const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
   const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
   const env = parseEnvFile(envText);
+  const envUpdates: EnvMap = {};
 
   const baseUrl = normalizePublicBaseUrl(flags["base-url"] ?? env.PUBLIC_BASE_URL ?? "");
   if (!baseUrl) {
@@ -1631,6 +1675,7 @@ function handleSetupAsterisk(args: string[], context: CliContext): void {
   const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
   const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
   const env = parseEnvFile(envText);
+  const envUpdates: EnvMap = {};
   const bridgeDialTimeoutSecRaw = Number(flags["bridge-timeout-sec"] ?? "90");
   if (!Number.isFinite(bridgeDialTimeoutSecRaw) || bridgeDialTimeoutSecRaw < 10) {
     die("setup-asterisk --bridge-timeout-sec must be >= 10");
@@ -1640,17 +1685,41 @@ function handleSetupAsterisk(args: string[], context: CliContext): void {
   const twilioSipAuthUsername = pickNonEmpty(
     flags["twilio-sip-username"],
     env.TWILIO_SIP_AUTH_USERNAME,
+    env.TWILIO_ACCOUNT_SID,
   );
   const twilioSipAuthPassword = pickNonEmpty(
     flags["twilio-sip-password"],
     env.TWILIO_SIP_AUTH_PASSWORD,
+    env.TWILIO_AUTH_TOKEN,
   );
   const outboundTargetE164 = pickNonEmpty(env.OUTBOUND_TARGET_E164);
+  const defaultBridgeDialString = outboundTargetE164
+    ? defaultAsteriskOutboundDialString(outboundTargetE164, twilioOutboundEndpointName)
+    : undefined;
   const bridgeDialString =
-    pickNonEmpty(flags["bridge-dial-string"], env.ASTERISK_OUTBOUND_DIAL_STRING) ??
+    pickNonEmpty(flags["bridge-dial-string"], env.ASTERISK_OUTBOUND_DIAL_STRING, defaultBridgeDialString) ??
     (twilioSipTrunkHost && outboundTargetE164
       ? `PJSIP/${outboundTargetE164}@${twilioOutboundEndpointName}`
       : undefined);
+  if (!pickNonEmpty(env.ASTERISK_OUTBOUND_DIAL_STRING) && bridgeDialString) {
+    envUpdates.ASTERISK_OUTBOUND_DIAL_STRING = bridgeDialString;
+  }
+  if (!pickNonEmpty(env.TWILIO_SIP_AUTH_USERNAME) && twilioSipAuthUsername) {
+    envUpdates.TWILIO_SIP_AUTH_USERNAME = twilioSipAuthUsername;
+  }
+  if (!pickNonEmpty(env.TWILIO_SIP_AUTH_PASSWORD) && twilioSipAuthPassword) {
+    envUpdates.TWILIO_SIP_AUTH_PASSWORD = twilioSipAuthPassword;
+  }
+  if (Object.keys(envUpdates).length > 0) {
+    updateEnvFile(envPath, envUpdates, context.projectRoot);
+    for (const [key, value] of Object.entries(envUpdates)) {
+      if (key.includes("PASSWORD") || key.includes("TOKEN")) {
+        process.stdout.write(`[sandalphone] updated ${envPath}: ${key}=<redacted>\n`);
+      } else {
+        process.stdout.write(`[sandalphone] updated ${envPath}: ${key}=${value}\n`);
+      }
+    }
+  }
 
   runAsteriskSetup({
     endpointName,
