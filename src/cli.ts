@@ -198,9 +198,6 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       PUBLIC_BASE_URL: currentValues.PUBLIC_BASE_URL ?? "",
       OUTBOUND_TARGET_E164:
         currentValues.OUTBOUND_TARGET_E164 ?? "+15555550100",
-      ASTERISK_OUTBOUND_DIAL_STRING:
-        currentValues.ASTERISK_OUTBOUND_DIAL_STRING ??
-        defaultAsteriskOutboundDialString(currentValues.OUTBOUND_TARGET_E164 ?? "+15555550100"),
       TWILIO_ACCOUNT_SID: currentValues.TWILIO_ACCOUNT_SID ?? "",
       TWILIO_PHONE_NUMBER: currentValues.TWILIO_PHONE_NUMBER ?? "",
       VOIPMS_DID: currentValues.VOIPMS_DID ?? "",
@@ -209,6 +206,7 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       CONTROL_API_SECRET:
         pickNonEmpty(currentValues.CONTROL_API_SECRET) ?? randomBytes(16).toString("hex"),
       TWILIO_AUTH_TOKEN: currentValues.TWILIO_AUTH_TOKEN ?? "",
+      TWILIO_OUTBOUND_DIAL_STRING: currentValues.TWILIO_OUTBOUND_DIAL_STRING ?? "",
       TWILIO_SIP_TRUNK_HOST: currentValues.TWILIO_SIP_TRUNK_HOST ?? "",
       TWILIO_SIP_AUTH_USERNAME:
         currentValues.TWILIO_SIP_AUTH_USERNAME ?? currentValues.TWILIO_ACCOUNT_SID ?? "",
@@ -299,11 +297,6 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
       },
       },
     );
-    const defaultDialString = defaultAsteriskOutboundDialString(outboundTargetE164);
-    await promptAndPersist("ASTERISK_OUTBOUND_DIAL_STRING", "Asterisk outbound dial string", {
-      defaultValue: currentValues.ASTERISK_OUTBOUND_DIAL_STRING ?? defaultDialString,
-      required: true,
-    });
     await promptAndPersist("PUBLIC_BASE_URL", "Public base URL (for Twilio signature checks)", {
       defaultValue: detectedPublicBaseUrl || defaults.PUBLIC_BASE_URL,
     });
@@ -390,6 +383,13 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
         defaultValue: defaults.TWILIO_AUTH_TOKEN,
         secret: true,
         required: (updates.TWILIO_PHONE_NUMBER ?? "").trim().length > 0,
+      },
+    );
+    await promptAndPersist(
+      "TWILIO_OUTBOUND_DIAL_STRING",
+      "Twilio outbound dial override (optional; defaults to OUTBOUND_TARGET_E164)",
+      {
+        defaultValue: defaults.TWILIO_OUTBOUND_DIAL_STRING,
       },
     );
     await promptAndPersist("TWILIO_SIP_TRUNK_HOST", "Twilio SIP trunk host (for Asterisk bridge)", {
@@ -926,15 +926,6 @@ async function maybePromptEnvMigrations(
       value: "private_translation",
       message:
         "DEFAULT_SESSION_MODE is missing from .env. Add DEFAULT_SESSION_MODE=private_translation now?",
-    });
-  }
-  const outboundTarget = pickNonEmpty(env.OUTBOUND_TARGET_E164);
-  if (!pickNonEmpty(env.ASTERISK_OUTBOUND_DIAL_STRING) && outboundTarget) {
-    const fallback = defaultAsteriskOutboundDialString(outboundTarget);
-    missing.push({
-      key: "ASTERISK_OUTBOUND_DIAL_STRING",
-      value: fallback,
-      message: `ASTERISK_OUTBOUND_DIAL_STRING is missing from .env. Add ASTERISK_OUTBOUND_DIAL_STRING=${fallback} now?`,
     });
   }
   if (missing.length === 0) return;
@@ -1697,13 +1688,10 @@ function handleSetupAsterisk(args: string[], context: CliContext): void {
     ? defaultAsteriskOutboundDialString(outboundTargetE164, twilioOutboundEndpointName)
     : undefined;
   const bridgeDialString =
-    pickNonEmpty(flags["bridge-dial-string"], env.ASTERISK_OUTBOUND_DIAL_STRING, defaultBridgeDialString) ??
+    pickNonEmpty(flags["bridge-dial-string"], env.TWILIO_OUTBOUND_DIAL_STRING, defaultBridgeDialString) ??
     (twilioSipTrunkHost && outboundTargetE164
       ? `PJSIP/${outboundTargetE164}@${twilioOutboundEndpointName}`
       : undefined);
-  if (!pickNonEmpty(env.ASTERISK_OUTBOUND_DIAL_STRING) && bridgeDialString) {
-    envUpdates.ASTERISK_OUTBOUND_DIAL_STRING = bridgeDialString;
-  }
   if (!pickNonEmpty(env.TWILIO_SIP_AUTH_USERNAME) && twilioSipAuthUsername) {
     envUpdates.TWILIO_SIP_AUTH_USERNAME = twilioSipAuthUsername;
   }
@@ -1847,14 +1835,14 @@ function runAsteriskSetup(options: AsteriskSetupOptions): void {
       );
     } else {
       extensionsLines.push(
-        ` same => n,NoOp(Sandalphone bridge mode missing ASTERISK_OUTBOUND_DIAL_STRING)`,
+        ` same => n,NoOp(Sandalphone bridge mode missing outbound dial target)`,
         ` same => n,Playback(${options.testPromptFile})`,
       );
       process.stdout.write(
         "[sandalphone] WARN bridge mode has no dial string; fallback to test playback\n",
       );
       process.stdout.write(
-        "[sandalphone] set ASTERISK_OUTBOUND_DIAL_STRING (example: PJSIP/${OUTBOUND_TARGET_E164}@twilio-out)\n",
+        "[sandalphone] set OUTBOUND_TARGET_E164 (or optional TWILIO_OUTBOUND_DIAL_STRING override)\n",
       );
     }
   } else {

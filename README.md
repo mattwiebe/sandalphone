@@ -222,8 +222,9 @@ This command:
 - infers and writes `TWILIO_UNTRUSTED_SIP_URI` using a public host/IP (avoids `.ts.net`); rerun with `--public-host` to force host selection
 - defaults to `--mode bridge` (inbound SIP call answers and attempts to `Dial(...)` instead of test playback)
 
-Bridge mode needs an outbound dial string. Set one of:
-- `ASTERISK_OUTBOUND_DIAL_STRING` in `.env` (example: `PJSIP/+15555550100@twilio-out`)
+Bridge mode uses `OUTBOUND_TARGET_E164` by default.
+Optional provider-specific override:
+- `TWILIO_OUTBOUND_DIAL_STRING` in `.env` (example: `PJSIP/+15555550100@twilio-out`)
 - or pass `--bridge-dial-string ...` directly to `setup-asterisk`
 
 Optional Twilio SIP endpoint generation in `pjsip_sandalphone.conf`:
@@ -457,7 +458,7 @@ Alternative locator:
 - `TWILIO_VOICE_MODE` (`dial` or `stream`; default `dial`)
 - `TWILIO_STREAM_WS_URL` (optional explicit stream websocket URL; when empty derives from `PUBLIC_BASE_URL` as `/twilio/stream`)
 - `TWILIO_UNTRUSTED_SIP_URI` (optional SIP URI for untrusted inbound handoff when stream mode is enabled)
-- `ASTERISK_OUTBOUND_DIAL_STRING` (Asterisk bridge dial target; default pattern `PJSIP/<OUTBOUND_TARGET_E164>@twilio-out`)
+- `TWILIO_OUTBOUND_DIAL_STRING` (optional Twilio-specific Asterisk dial override; default derives from `OUTBOUND_TARGET_E164`)
 - `TWILIO_SIP_TRUNK_HOST` (optional Twilio SIP trunk host used by `setup-asterisk` to build `twilio-out`)
 - `TWILIO_SIP_AUTH_USERNAME` (optional SIP auth user; defaults to `TWILIO_ACCOUNT_SID` when missing)
 - `TWILIO_SIP_AUTH_PASSWORD` (optional SIP auth password; defaults to `TWILIO_AUTH_TOKEN` when missing)
