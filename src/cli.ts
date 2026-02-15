@@ -48,6 +48,13 @@ type AsteriskSetupOptions = {
   rtpEnd: number;
   matchCidr: string;
   testPromptFile: string;
+  mode: "bridge" | "test";
+  bridgeDialString?: string;
+  bridgeDialTimeoutSec: number;
+  twilioOutboundEndpointName: string;
+  twilioSipTrunkHost?: string;
+  twilioSipAuthUsername?: string;
+  twilioSipAuthPassword?: string;
   autoInstall: boolean;
 };
 
@@ -509,6 +516,13 @@ async function handleInstall(args: string[], context: CliContext): Promise<void>
           rtpEnd: 20000,
           matchCidr: "0.0.0.0/0",
           testPromptFile: "hello-world",
+          mode: "bridge",
+          bridgeDialString: undefined,
+          bridgeDialTimeoutSec: 90,
+          twilioOutboundEndpointName: "twilio-out",
+          twilioSipTrunkHost: undefined,
+          twilioSipAuthUsername: undefined,
+          twilioSipAuthPassword: undefined,
           autoInstall: true,
         });
       } else {
@@ -1608,8 +1622,35 @@ function handleSetupAsterisk(args: string[], context: CliContext): void {
   const rtpEnd = Number(flags["rtp-end"] ?? "20000");
   const matchCidr = flags["match-cidr"] ?? "0.0.0.0/0";
   const testPromptFile = flags["test-prompt"] ?? "hello-world";
+  const modeRaw = (flags.mode ?? "bridge").trim().toLowerCase();
+  if (modeRaw !== "bridge" && modeRaw !== "test") {
+    die("setup-asterisk --mode must be bridge or test");
+  }
   const autoInstall = flags["no-install"] !== "1" && flags["no-install"] !== "true";
   const publicHostOverride = flags["public-host"]?.trim();
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const env = parseEnvFile(envText);
+  const bridgeDialTimeoutSecRaw = Number(flags["bridge-timeout-sec"] ?? "90");
+  if (!Number.isFinite(bridgeDialTimeoutSecRaw) || bridgeDialTimeoutSecRaw < 10) {
+    die("setup-asterisk --bridge-timeout-sec must be >= 10");
+  }
+  const twilioOutboundEndpointName = flags["twilio-out-endpoint"] ?? "twilio-out";
+  const twilioSipTrunkHost = pickNonEmpty(flags["twilio-sip-host"], env.TWILIO_SIP_TRUNK_HOST);
+  const twilioSipAuthUsername = pickNonEmpty(
+    flags["twilio-sip-username"],
+    env.TWILIO_SIP_AUTH_USERNAME,
+  );
+  const twilioSipAuthPassword = pickNonEmpty(
+    flags["twilio-sip-password"],
+    env.TWILIO_SIP_AUTH_PASSWORD,
+  );
+  const outboundTargetE164 = pickNonEmpty(env.OUTBOUND_TARGET_E164);
+  const bridgeDialString =
+    pickNonEmpty(flags["bridge-dial-string"], env.ASTERISK_OUTBOUND_DIAL_STRING) ??
+    (twilioSipTrunkHost && outboundTargetE164
+      ? `PJSIP/${outboundTargetE164}@${twilioOutboundEndpointName}`
+      : undefined);
 
   runAsteriskSetup({
     endpointName,
@@ -1620,12 +1661,16 @@ function handleSetupAsterisk(args: string[], context: CliContext): void {
     rtpEnd,
     matchCidr,
     testPromptFile,
+    mode: modeRaw as "bridge" | "test",
+    bridgeDialString,
+    bridgeDialTimeoutSec: Math.round(bridgeDialTimeoutSecRaw),
+    twilioOutboundEndpointName,
+    twilioSipTrunkHost,
+    twilioSipAuthUsername,
+    twilioSipAuthPassword,
     autoInstall,
   });
 
-  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
-  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
-  const env = parseEnvFile(envText);
   const existingSipUri = pickNonEmpty(env.TWILIO_UNTRUSTED_SIP_URI);
   const existingIsTailscale = existingSipUri?.includes(".ts.net") ?? false;
   if (!existingSipUri || existingIsTailscale || publicHostOverride) {
@@ -1683,23 +1728,76 @@ function runAsteriskSetup(options: AsteriskSetupOptions): void {
     `endpoint=${options.endpointName}`,
     `match=${options.matchCidr}`,
     ``,
+    ...(options.twilioSipTrunkHost && options.twilioSipAuthUsername && options.twilioSipAuthPassword
+      ? [
+          `[${options.twilioOutboundEndpointName}]`,
+          `type=endpoint`,
+          `transport=transport-udp`,
+          `context=${options.contextName}`,
+          `disallow=all`,
+          `allow=ulaw`,
+          `aors=${options.twilioOutboundEndpointName}`,
+          `outbound_auth=${options.twilioOutboundEndpointName}-auth`,
+          `from_domain=${options.twilioSipTrunkHost}`,
+          `direct_media=no`,
+          `rtp_symmetric=yes`,
+          `rewrite_contact=yes`,
+          `force_rport=yes`,
+          ``,
+          `[${options.twilioOutboundEndpointName}]`,
+          `type=aor`,
+          `contact=sip:${options.twilioSipTrunkHost}`,
+          `qualify_frequency=60`,
+          ``,
+          `[${options.twilioOutboundEndpointName}-auth]`,
+          `type=auth`,
+          `auth_type=userpass`,
+          `username=${options.twilioSipAuthUsername}`,
+          `password=${options.twilioSipAuthPassword}`,
+          ``,
+        ]
+      : []),
   ].join("\n");
   writeFileSync(pjsipInclude, pjsipText, "utf8");
   ensureIncludeDirective(pjsipMain, "#include pjsip_sandalphone.conf");
 
-  const extensionsText = [
+  const extensionsLines = [
     `; managed by sandalphone setup-asterisk`,
     `[${options.contextName}]`,
     `exten => ${options.endpointName},1,Goto(s,1)`,
     `exten => _.,1,Goto(s,1)`,
     `exten => s,1,NoOp(Sandalphone Twilio inbound reached Asterisk)`,
     ` same => n,Answer()`,
-    ` same => n,Playback(${options.testPromptFile})`,
+  ];
+
+  if (options.mode === "bridge") {
+    if (options.bridgeDialString) {
+      extensionsLines.push(
+        ` same => n,NoOp(Sandalphone bridge dial ${options.bridgeDialString})`,
+        ` same => n,Dial(${options.bridgeDialString},${options.bridgeDialTimeoutSec})`,
+      );
+    } else {
+      extensionsLines.push(
+        ` same => n,NoOp(Sandalphone bridge mode missing ASTERISK_OUTBOUND_DIAL_STRING)`,
+        ` same => n,Playback(${options.testPromptFile})`,
+      );
+      process.stdout.write(
+        "[sandalphone] WARN bridge mode has no dial string; fallback to test playback\n",
+      );
+      process.stdout.write(
+        "[sandalphone] set ASTERISK_OUTBOUND_DIAL_STRING (example: PJSIP/${OUTBOUND_TARGET_E164}@twilio-out)\n",
+      );
+    }
+  } else {
+    extensionsLines.push(` same => n,Playback(${options.testPromptFile})`);
+  }
+  extensionsLines.push(
     ` same => n,Hangup()`,
     `exten => h,1,NoOp(Sandalphone Twilio hangup handler)`,
     ` same => n,Hangup()`,
     ``,
-  ].join("\n");
+  );
+  const extensionsText = extensionsLines.join("\n");
   writeFileSync(extensionsInclude, extensionsText, "utf8");
   ensureIncludeDirective(extensionsMain, "#include extensions_sandalphone.conf");
 
@@ -1992,7 +2090,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone openclaw command --command \"...\" [--base-url URL] [--secret SECRET]\n`);
   process.stdout.write(`  sandalphone session <list|set|passthrough|translation|translate|debug>\n`);
   process.stdout.write(`  sandalphone mode <status|translation>\n`);
-  process.stdout.write(`  sandalphone setup-asterisk [--env-path .env]\n`);
+  process.stdout.write(`  sandalphone setup-asterisk [--env-path .env] [--mode bridge|test]\n`);
   process.stdout.write(`  sandalphone funnel <action>\n`);
   process.stdout.write(`  sandalphone doctor deploy [--env-path .env]\n`);
   process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);

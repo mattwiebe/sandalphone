@@ -220,6 +220,22 @@ This command:
 - opens SIP/RTP firewall rules via `ufw` (best-effort)
 - restarts and reloads Asterisk
 - infers and writes `TWILIO_UNTRUSTED_SIP_URI` using a public host/IP (avoids `.ts.net`); rerun with `--public-host` to force host selection
+- defaults to `--mode bridge` (inbound SIP call answers and attempts to `Dial(...)` instead of test playback)
+
+Bridge mode needs an outbound dial string. Set one of:
+- `ASTERISK_OUTBOUND_DIAL_STRING` in `.env` (example: `PJSIP/+15555550100@twilio-out`)
+- or pass `--bridge-dial-string ...` directly to `setup-asterisk`
+
+Optional Twilio SIP endpoint generation in `pjsip_sandalphone.conf`:
+- `TWILIO_SIP_TRUNK_HOST`
+- `TWILIO_SIP_AUTH_USERNAME`
+- `TWILIO_SIP_AUTH_PASSWORD`
+
+Quick test mode is still available:
+
+```bash
+sudo sandalphone setup-asterisk --mode test
+```
 
 ### Tailscale Funnel Commands
 Manage local public ingress from CLI:
