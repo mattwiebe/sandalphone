@@ -292,6 +292,12 @@ sandalphone session translation toggle --session-id <id>
 - `GET /asterisk/egress/next` (poll next translated audio chunk)
 - `WS /twilio/stream` (Twilio media stream)
 
+Provider-agnostic media pump (stdin -> `/asterisk/media`, `/asterisk/egress/next` -> stdout):
+
+```bash
+sandalphone bridge pump --call-id sip-123 --source voipms --from +15550000001 --to +18005550199
+```
+
 ## Deploy (VPS)
 1. Install Node.js 22+ on VPS.
 2. Clone repo and move into `/Users/matt/levi`.
@@ -329,6 +335,7 @@ sandalphone session translation toggle --session-id <id>
 ```json
 {
   "callId": "sip-123",
+  "source": "voipms",
   "from": "+15550000001",
   "to": "+18005550199"
 }
@@ -349,6 +356,7 @@ Response:
 ```json
 {
   "callId": "sip-123",
+  "source": "voipms",
   "sampleRateHz": 8000,
   "encoding": "mulaw",
   "payloadBase64": "AQI=",

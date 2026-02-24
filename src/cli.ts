@@ -150,6 +150,10 @@ async function main(argv: string[]): Promise<void> {
       handleSetupAsterisk(rest, context);
       return;
     }
+    case "bridge": {
+      handleBridge(rest, context);
+      return;
+    }
     case "funnel": {
       handleFunnel(rest, context);
       return;
@@ -1086,6 +1090,47 @@ function handleDoctor(args: string[], context: CliContext): void {
   }
 
   runNodeScript("scripts/deploy-preflight.mjs", context, env);
+}
+
+function handleBridge(args: string[], context: CliContext): void {
+  const action = (args[0] ?? "help").toLowerCase();
+  if (action === "help") {
+    printBridgeHelp();
+    return;
+  }
+  if (action !== "pump") {
+    die(`unknown bridge action: ${action}`);
+  }
+
+  const { flags } = parseFlags(args.slice(1));
+  const envPath = resolve(context.projectRoot, flags["env-path"] ?? ".env");
+  const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+  const envFile = parseEnvFile(envText);
+  const port = envFile.PORT?.trim() || "8080";
+  const baseUrl = normalizePublicBaseUrl(flags["base-url"] ?? `http://127.0.0.1:${port}`);
+  const callId = flags["call-id"]?.trim();
+  if (!callId) {
+    die("bridge pump requires --call-id");
+  }
+
+  const env: Dict = {
+    BRIDGE_BASE_URL: baseUrl,
+    BRIDGE_CALL_ID: callId,
+    BRIDGE_SOURCE: (flags.source ?? "voipms").trim().toLowerCase(),
+    BRIDGE_FROM: flags.from,
+    BRIDGE_TO: flags.to,
+    BRIDGE_ENCODING: flags.encoding ?? "mulaw",
+    BRIDGE_SAMPLE_RATE_HZ: flags["sample-rate-hz"] ?? "8000",
+    BRIDGE_MEDIA_CHUNK_MS: flags["chunk-ms"] ?? "20",
+    BRIDGE_EGRESS_POLL_MS: flags["poll-ms"] ?? "40",
+    BRIDGE_BOOTSTRAP: flags.bootstrap ?? "1",
+    BRIDGE_SESSION_ID: flags["session-id"],
+  };
+  const secret = flags.secret?.trim() || envFile.ASTERISK_SHARED_SECRET?.trim() || "";
+  if (secret) {
+    env.BRIDGE_ASTERISK_SECRET = secret;
+  }
+  runNodeScript("scripts/bridge-pump.mjs", context, env);
 }
 
 function handleUrls(args: string[], context: CliContext): void {
@@ -2148,6 +2193,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone session <list|set|passthrough|translation|translate|debug>\n`);
   process.stdout.write(`  sandalphone mode <status|translation>\n`);
   process.stdout.write(`  sandalphone setup-asterisk [--env-path .env] [--mode bridge|test]\n`);
+  process.stdout.write(`  sandalphone bridge <action>\n`);
   process.stdout.write(`  sandalphone funnel <action>\n`);
   process.stdout.write(`  sandalphone doctor deploy [--env-path .env]\n`);
   process.stdout.write(`  sandalphone doctor local [--env-path .env]\n`);
@@ -2155,6 +2201,7 @@ function printHelp(): void {
   process.stdout.write(`  sandalphone service <action>\n\n`);
   printFunnelHelp();
   printSmokeHelp();
+  printBridgeHelp();
   printSessionHelp();
   printModeHelp();
   printServiceHelp();
@@ -2176,6 +2223,14 @@ function printSmokeHelp(): void {
   process.stdout.write(`  sandalphone smoke inbound --disable [--base-url URL] [--secret SECRET] [--env-path .env]\n`);
   process.stdout.write(`  sandalphone smoke outbound [--to E164] [--from E164] [--message "text"]\n`);
   process.stdout.write(`  sandalphone smoke twilio-stream [--base-url URL] [--env-path .env]\n`);
+  process.stdout.write(`\n`);
+}
+
+function printBridgeHelp(): void {
+  process.stdout.write(`Bridge actions:\n`);
+  process.stdout.write(`  sandalphone bridge pump --call-id ID [--source voipms|twilio] [--from E164] [--to E164]\n`);
+  process.stdout.write(`    [--base-url URL] [--secret SECRET] [--encoding mulaw|pcm_s16le] [--sample-rate-hz 8000]\n`);
+  process.stdout.write(`    [--chunk-ms 20] [--poll-ms 40] [--bootstrap 1|0] [--session-id ID]\n`);
   process.stdout.write(`\n`);
 }
 

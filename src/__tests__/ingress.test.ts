@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseTwilioIncoming } from "../ingress/twilio.js";
 import {
+  mapAsteriskMediaToFrame,
+  parseAsteriskIncoming,
   resolveAsteriskEndSessionId,
   validateAsteriskEndPayload,
   validateAsteriskInboundPayload,
@@ -39,6 +41,7 @@ test("parseTwilioIncoming maps required fields", () => {
 test("validateAsteriskInboundPayload accepts valid payload", () => {
   const ok = validateAsteriskInboundPayload({
     callId: "sip-1",
+    source: "twilio",
     from: "+15550000001",
     to: "+18005550199",
   });
@@ -56,11 +59,44 @@ test("validateAsteriskInboundPayload rejects invalid payload", () => {
 test("validateAsteriskMediaPayload accepts valid payload", () => {
   const ok = validateAsteriskMediaPayload({
     callId: "sip-1",
+    source: "twilio",
     sampleRateHz: 8000,
     encoding: "mulaw",
     payloadBase64: Buffer.from([0x01, 0x02]).toString("base64"),
   });
   assert.equal(ok, true);
+});
+
+test("parseAsteriskIncoming keeps explicit source", () => {
+  const event = parseAsteriskIncoming({
+    callId: "tw-call-1",
+    source: "twilio",
+    from: "+15550000001",
+    to: "+18005550199",
+  });
+  assert.equal(event.source, "twilio");
+  assert.equal(event.externalCallId, "tw-call-1");
+});
+
+test("mapAsteriskMediaToFrame resolves using payload source", () => {
+  const orchestrator = makeOrchestrator();
+  const session = orchestrator.onIncomingCall({
+    source: "twilio",
+    externalCallId: "tw-call-2",
+    from: "+15550000001",
+    to: "+18005550199",
+    receivedAtMs: Date.now(),
+  });
+  const frame = mapAsteriskMediaToFrame(orchestrator, {
+    callId: "tw-call-2",
+    source: "twilio",
+    sampleRateHz: 8000,
+    encoding: "mulaw",
+    payloadBase64: Buffer.from([0x01, 0x02]).toString("base64"),
+  });
+  assert.ok(frame);
+  assert.equal(frame?.sessionId, session.id);
+  assert.equal(frame?.source, "twilio");
 });
 
 test("validateAsteriskEndPayload accepts callId or sessionId", () => {

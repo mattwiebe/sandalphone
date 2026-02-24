@@ -5,10 +5,12 @@ export type AsteriskInboundPayload = {
   callId: string;
   from: string;
   to: string;
+  source?: "voipms" | "twilio";
 };
 
 export type AsteriskMediaPayload = {
   callId: string;
+  source?: "voipms" | "twilio";
   sampleRateHz: number;
   encoding: "pcm_s16le" | "mulaw";
   payloadBase64: string;
@@ -24,14 +26,24 @@ export type AsteriskEndPayload = {
 export function validateAsteriskInboundPayload(payload: unknown): payload is AsteriskInboundPayload {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
-  return typeof p.callId === "string" && typeof p.from === "string" && typeof p.to === "string";
+  const source = p.source;
+  const sourceOk = source === undefined || source === "voipms" || source === "twilio";
+  return (
+    sourceOk &&
+    typeof p.callId === "string" &&
+    typeof p.from === "string" &&
+    typeof p.to === "string"
+  );
 }
 
 export function validateAsteriskMediaPayload(payload: unknown): payload is AsteriskMediaPayload {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
   const encoding = p.encoding;
+  const source = p.source;
+  const sourceOk = source === undefined || source === "voipms" || source === "twilio";
   return (
+    sourceOk &&
     typeof p.callId === "string" &&
     typeof p.sampleRateHz === "number" &&
     (encoding === "pcm_s16le" || encoding === "mulaw") &&
@@ -51,7 +63,7 @@ export function validateAsteriskEndPayload(payload: unknown): payload is Asteris
 
 export function parseAsteriskIncoming(payload: AsteriskInboundPayload): IncomingCallEvent {
   return {
-    source: "voipms",
+    source: payload.source ?? "voipms",
     externalCallId: payload.callId,
     from: payload.from,
     to: payload.to,
@@ -74,12 +86,13 @@ export function mapAsteriskMediaToFrame(
   orchestrator: VoiceOrchestrator,
   payload: AsteriskMediaPayload,
 ): AudioFrame | null {
-  const sessionId = orchestrator.resolveSessionIdByExternal("voipms", payload.callId);
+  const source = payload.source ?? "voipms";
+  const sessionId = orchestrator.resolveSessionIdByExternal(source, payload.callId);
   if (!sessionId) return null;
 
   return {
     sessionId,
-    source: "voipms",
+    source,
     sampleRateHz: payload.sampleRateHz,
     encoding: payload.encoding,
     timestampMs: payload.timestampMs ?? Date.now(),
