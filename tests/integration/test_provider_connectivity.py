@@ -28,7 +28,7 @@ from runtime_cloud_service.translation_pipeline import DeepLTranslateClient, Tra
 
 
 _SPANISH_TEXT = "hola como estas necesito ayuda con una traduccion"
-_FIXTURE_AUDIO = Path("/Users/matt/levi/tests/fixtures/spanish_hola_como_estas.wav")
+_FIXTURE_AUDIO = Path(__file__).resolve().parents[1] / "fixtures" / "spanish_hola_como_estas.wav"
 
 
 def _require_env(name: str) -> str:
