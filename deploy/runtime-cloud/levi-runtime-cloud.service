@@ -1,0 +1,22 @@
+[Unit]
+Description=Levi Runtime Cloud
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/levi-runtime-cloud
+EnvironmentFile=/opt/levi-runtime-cloud/.env
+ExecStart=/opt/levi-runtime-cloud/.venv/bin/uvicorn runtime_cloud_service.app:app --host 0.0.0.0 --port 8787
+Restart=always
+RestartSec=2
+User=sandalphone
+Group=sandalphone
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/levi-runtime-cloud
+
+[Install]
+WantedBy=multi-user.target
