@@ -211,6 +211,15 @@ def trusted_page() -> str:
         margin-top: 18px;
         padding-left: 20px;
       }
+      #log {
+        margin-top: 18px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(28, 25, 23, 0.9);
+        color: #f5f5f4;
+        font: 0.85rem/1.5 ui-monospace, SFMono-Regular, monospace;
+        white-space: pre-wrap;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.6/dist/livekit-client.umd.min.js"></script>
   </head>
@@ -239,17 +248,23 @@ def trusted_page() -> str:
         </form>
         <div id="status">Idle.</div>
         <ul id="participants"></ul>
+        <pre id="log">Ready.</pre>
       </div>
     </main>
     <script>
       const statusEl = document.getElementById("status");
       const participantsEl = document.getElementById("participants");
+      const logEl = document.getElementById("log");
       const form = document.getElementById("join-form");
       const leaveButton = document.querySelector("[data-leave]");
       let room;
 
       function setStatus(message) {
         statusEl.textContent = message;
+      }
+
+      function log(message) {
+        logEl.textContent = `${new Date().toISOString()} ${message}\n${logEl.textContent}`.trim();
       }
 
       function renderParticipants() {
@@ -268,42 +283,71 @@ def trusted_page() -> str:
         element.autoplay = true;
         element.playsInline = true;
         document.body.appendChild(element);
+        log(`Attached audio track ${track.sid}`);
       }
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        setStatus("Requesting LiveKit token...");
-        if (room) {
-          await room.disconnect();
-        }
-
-        const payload = {
-          room_name: document.getElementById("room").value,
-          identity: document.getElementById("identity").value,
-          name: document.getElementById("name").value,
-        };
-        const response = await fetch("/trusted/credentials", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const credentials = await response.json();
-        room = new LivekitClient.Room();
-        room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
-          if (track.kind === "audio") {
-            attachAudio(track);
+        try {
+          setStatus("Requesting LiveKit token...");
+          log("Requesting trusted-leg credentials");
+          if (room) {
+            await room.disconnect();
           }
-        });
-        room.on(LivekitClient.RoomEvent.ParticipantConnected, renderParticipants);
-        room.on(LivekitClient.RoomEvent.ParticipantDisconnected, renderParticipants);
-        room.on(LivekitClient.RoomEvent.Disconnected, () => {
-          setStatus("Disconnected.");
-          renderParticipants();
-        });
 
-        await room.connect(credentials.serverUrl, credentials.participantToken);
-        renderParticipants();
-        setStatus(`Connected to ${credentials.roomName} as ${credentials.participantIdentity}.`);
+          const payload = {
+            room_name: document.getElementById("room").value,
+            identity: document.getElementById("identity").value,
+            name: document.getElementById("name").value,
+          };
+          const response = await fetch("/trusted/credentials", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error(`Credential request failed: ${response.status}`);
+          }
+          const credentials = await response.json();
+          log(`Received token for ${credentials.participantIdentity}`);
+
+          room = new LivekitClient.Room({
+            adaptiveStream: true,
+            dynacast: true,
+          });
+          room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+            if (track.kind === "audio") {
+              attachAudio(track);
+            }
+          });
+          room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
+            log(`Participant connected: ${participant.identity}`);
+            renderParticipants();
+          });
+          room.on(LivekitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+            log(`Participant disconnected: ${participant.identity}`);
+            renderParticipants();
+          });
+          room.on(LivekitClient.RoomEvent.ConnectionStateChanged, (state) => {
+            log(`Connection state: ${state}`);
+          });
+          room.on(LivekitClient.RoomEvent.Disconnected, () => {
+            setStatus("Disconnected.");
+            log("Room disconnected");
+            renderParticipants();
+          });
+
+          setStatus("Connecting to LiveKit...");
+          await room.connect(credentials.serverUrl, credentials.participantToken);
+          renderParticipants();
+          setStatus(`Connected to ${credentials.roomName} as ${credentials.participantIdentity}.`);
+          log("Trusted leg connected");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setStatus(`Error: ${message}`);
+          log(`Error: ${message}`);
+          console.error(error);
+        }
       });
 
       leaveButton.addEventListener("click", async () => {
@@ -312,6 +356,7 @@ def trusted_page() -> str:
           room = null;
         }
         setStatus("Disconnected.");
+        log("Left room");
         renderParticipants();
       });
     </script>
@@ -411,6 +456,20 @@ def caller_page() -> str:
         margin-top: 18px;
         padding-left: 20px;
       }
+      #warning, #log {
+        margin-top: 18px;
+        padding: 12px 14px;
+        border-radius: 14px;
+      }
+      #warning {
+        background: rgba(191, 219, 254, 0.85);
+      }
+      #log {
+        background: rgba(15, 23, 42, 0.92);
+        color: #e2e8f0;
+        font: 0.85rem/1.5 ui-monospace, SFMono-Regular, monospace;
+        white-space: pre-wrap;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.6/dist/livekit-client.umd.min.js"></script>
   </head>
@@ -438,11 +497,15 @@ def caller_page() -> str:
           </div>
         </form>
         <div id="status">Idle.</div>
+        <div id="warning"></div>
         <ul id="participants"></ul>
+        <pre id="log">Ready.</pre>
       </div>
     </main>
     <script>
       const statusEl = document.getElementById("status");
+      const warningEl = document.getElementById("warning");
+      const logEl = document.getElementById("log");
       const participantsEl = document.getElementById("participants");
       const form = document.getElementById("join-form");
       const leaveButton = document.querySelector("[data-leave]");
@@ -450,6 +513,10 @@ def caller_page() -> str:
 
       function setStatus(message) {
         statusEl.textContent = message;
+      }
+
+      function log(message) {
+        logEl.textContent = `${new Date().toISOString()} ${message}\n${logEl.textContent}`.trim();
       }
 
       function renderParticipants() {
@@ -467,40 +534,74 @@ def caller_page() -> str:
           room = null;
         }
         setStatus("Disconnected.");
+        log("Left room");
         renderParticipants();
+      }
+
+      if (!window.isSecureContext) {
+        warningEl.textContent = "This page is not running in a secure context. Browsers usually block microphone access on plain HTTP. Use HTTPS for real caller simulation.";
+        log("Secure context missing; microphone publish will likely fail.");
+      } else {
+        warningEl.textContent = "Secure context detected.";
       }
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        await leaveRoom();
-        setStatus("Requesting LiveKit token...");
+        try {
+          await leaveRoom();
+          setStatus("Requesting LiveKit token...");
+          log("Requesting caller credentials");
 
-        const payload = {
-          room_name: document.getElementById("room").value,
-          identity: document.getElementById("identity").value,
-          name: document.getElementById("name").value,
-        };
-        const response = await fetch("/caller/credentials", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const credentials = await response.json();
-        room = new LivekitClient.Room({
-          adaptiveStream: true,
-          dynacast: true,
-        });
-        room.on(LivekitClient.RoomEvent.ParticipantConnected, renderParticipants);
-        room.on(LivekitClient.RoomEvent.ParticipantDisconnected, renderParticipants);
-        room.on(LivekitClient.RoomEvent.Disconnected, () => {
-          setStatus("Disconnected.");
+          const payload = {
+            room_name: document.getElementById("room").value,
+            identity: document.getElementById("identity").value,
+            name: document.getElementById("name").value,
+          };
+          const response = await fetch("/caller/credentials", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error(`Credential request failed: ${response.status}`);
+          }
+          const credentials = await response.json();
+          log(`Received token for ${credentials.participantIdentity}`);
+
+          room = new LivekitClient.Room({
+            adaptiveStream: true,
+            dynacast: true,
+          });
+          room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
+            log(`Participant connected: ${participant.identity}`);
+            renderParticipants();
+          });
+          room.on(LivekitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+            log(`Participant disconnected: ${participant.identity}`);
+            renderParticipants();
+          });
+          room.on(LivekitClient.RoomEvent.ConnectionStateChanged, (state) => {
+            log(`Connection state: ${state}`);
+          });
+          room.on(LivekitClient.RoomEvent.Disconnected, () => {
+            setStatus("Disconnected.");
+            log("Room disconnected");
+            renderParticipants();
+          });
+
+          setStatus("Connecting to LiveKit...");
+          await room.connect(credentials.serverUrl, credentials.participantToken);
+          log("Connected to LiveKit, enabling microphone");
+          await room.localParticipant.enableCameraAndMicrophone(false, true);
           renderParticipants();
-        });
-
-        await room.connect(credentials.serverUrl, credentials.participantToken);
-        await room.localParticipant.enableCameraAndMicrophone(false, true);
-        renderParticipants();
-        setStatus(`Connected to ${credentials.roomName} as ${credentials.participantIdentity}. Mic is live.`);
+          setStatus(`Connected to ${credentials.roomName} as ${credentials.participantIdentity}. Mic is live.`);
+          log("Caller microphone enabled");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setStatus(`Error: ${message}`);
+          log(`Error: ${message}`);
+          console.error(error);
+        }
       });
 
       leaveButton.addEventListener("click", leaveRoom);
