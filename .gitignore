@@ -27,11 +27,13 @@ wheels/
 mac/models/whisper.cpp/
 mac/models/qwen-7b-4bit/
 mac/models/qwen3-tts-0.6b/
+mlx_models
 
 # Data
 mac/data/
 *.db
 *.sqlite
+node_modules/
 
 # Audio files
 *.wav
