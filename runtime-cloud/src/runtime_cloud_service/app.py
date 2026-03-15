@@ -311,6 +311,19 @@ def trusted_page() -> str:
           const credentials = await response.json();
           log(`Received token for ${credentials.participantIdentity}`);
 
+          const botResponse = await fetch("/bot/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              room_name: credentials.roomName,
+              trusted_identity: credentials.participantIdentity,
+            }),
+          });
+          if (!botResponse.ok) {
+            throw new Error(`Bot start failed: ${botResponse.status}`);
+          }
+          log(`Bot start requested for ${credentials.roomName}`);
+
           room = new LivekitClient.Room({
             adaptiveStream: true,
             dynacast: true,
