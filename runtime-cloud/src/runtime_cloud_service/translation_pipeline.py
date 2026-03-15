@@ -9,6 +9,7 @@ from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.transcriptions.language import Language
 from pipecat.transports.livekit.transport import LiveKitOutputTransportMessageFrame
 from requests import Session
+from loguru import logger
 
 
 def _to_deepl_source_language(language: Language) -> str:
@@ -91,6 +92,12 @@ def build_translation_output_frames(
         transcription.text,
         source_language=transcription.language or config.source_language,
         target_language=config.target_language,
+    )
+    logger.info(
+        "trusted translation produced",
+        speaker_identity=transcription.user_id,
+        transcription=transcription.text,
+        translation=translated_text,
     )
     metadata = json.dumps(
         {

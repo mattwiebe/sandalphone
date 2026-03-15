@@ -60,3 +60,25 @@ def test_manager_reports_room_status() -> None:
         await manager.stop(room_name="call-main")
 
     asyncio.run(run_test())
+
+
+def test_manager_restarts_existing_room_bot() -> None:
+    async def run_test() -> None:
+        first_bot = _FakeBot()
+        second_bot = _FakeBot()
+        bots = iter([first_bot, second_bot])
+        manager = InMemoryBotManager(lambda room_name, trusted_identity: next(bots))
+
+        await manager.start(room_name="call-main", trusted_identity="trusted-matt")
+        await first_bot.started.wait()
+
+        restarted = await manager.start(room_name="call-main", trusted_identity="trusted-matt")
+        await second_bot.started.wait()
+
+        assert restarted.running is True
+        assert first_bot.stop_calls == 1
+        assert second_bot.run_calls == 1
+
+        await manager.stop(room_name="call-main")
+
+    asyncio.run(run_test())

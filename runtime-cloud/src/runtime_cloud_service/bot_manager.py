@@ -31,12 +31,12 @@ class InMemoryBotManager:
     async def start(self, *, room_name: str, trusted_identity: str) -> BotStatus:
         current = self._bots.get(room_name)
         if current is not None:
-            existing_identity, _, task = current
-            return BotStatus(
-                room_name=room_name,
-                trusted_identity=existing_identity,
-                running=not task.done(),
-            )
+            _, bot, task = current
+            await bot.stop()
+            try:
+                await task
+            except Exception:
+                logger.exception("trusted leg bot failed during restart", room_name=room_name)
 
         sentinel = _PendingBot()
 

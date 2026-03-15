@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import audioop
 import json
 import os
 from dataclasses import dataclass
 from typing import Protocol
 
 from livekit import api, rtc
+from loguru import logger
 from pipecat.frames.frames import (
     Frame,
     InterimTranscriptionFrame,
@@ -22,6 +24,7 @@ from pipecat.services.assemblyai.stt import AssemblyAISTTService, AssemblyAISTTS
 from pipecat.services.cartesia.tts import CartesiaTTSService, CartesiaTTSSettings
 from pipecat.transcriptions.language import Language
 from pipecat.transports.livekit.transport import LiveKitOutputTransportMessageFrame
+from pipecat.transports.livekit.transport import LiveKitParams
 from pipecat.transports.livekit.transport import LiveKitTransport
 
 from .translation_pipeline import DeepLTranslateClient, TranslationPipelineConfig, TranslationProcessor
@@ -51,6 +54,8 @@ class PassthroughTranslator:
 @dataclass(frozen=True)
 class ProviderBundle:
     assemblyai_api_key: str
+    assemblyai_sample_rate: int
+    assemblyai_speech_model: str
     deepl_api_key: str
     cartesia_api_key: str
     cartesia_voice_id: str
@@ -66,6 +71,11 @@ def _require_env(name: str) -> str:
 def build_provider_bundle_from_env() -> ProviderBundle:
     return ProviderBundle(
         assemblyai_api_key=_require_env("ASSEMBLYAI_API_KEY"),
+        assemblyai_sample_rate=int(os.getenv("ASSEMBLYAI_SAMPLE_RATE", "16000")),
+        assemblyai_speech_model=os.getenv(
+            "ASSEMBLYAI_SPEECH_MODEL",
+            "universal-streaming-multilingual",
+        ),
         deepl_api_key=_require_env("DEEPL_API_KEY"),
         cartesia_api_key=_require_env("CARTESIA_API_KEY"),
         cartesia_voice_id=_require_env("CARTESIA_VOICE_ID"),
@@ -91,6 +101,86 @@ class DropInputFramesProcessor(FrameProcessor):
         ):
             return
         await self.push_frame(frame, direction)
+
+
+def normalize_audio_for_stt(
+    *,
+    audio: bytes,
+    num_channels: int,
+    sample_rate: int,
+    target_sample_rate: int,
+) -> bytes:
+    normalized = audio
+    if num_channels > 1:
+        normalized = audioop.tomono(normalized, 2, 0.5, 0.5)
+    if sample_rate != target_sample_rate:
+        normalized, _ = audioop.ratecv(normalized, 2, 1, sample_rate, target_sample_rate, None)
+    return normalized
+
+
+class AudioNormalizeForSTTProcessor(FrameProcessor):
+    def __init__(self, *, target_sample_rate: int) -> None:
+        super().__init__()
+        self._target_sample_rate = target_sample_rate
+        self._debug_frames_remaining = int(os.getenv("STT_DEBUG_FRAME_LOGS", "8"))
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+
+        if direction is FrameDirection.DOWNSTREAM and isinstance(frame, UserAudioRawFrame):
+            normalized = normalize_audio_for_stt(
+                audio=frame.audio,
+                num_channels=frame.num_channels,
+                sample_rate=frame.sample_rate,
+                target_sample_rate=self._target_sample_rate,
+            )
+            if self._debug_frames_remaining > 0:
+                source_rms = audioop.rms(frame.audio, 2) if frame.audio else 0
+                normalized_rms = audioop.rms(normalized, 2) if normalized else 0
+                logger.info(
+                    "stt normalize frame user={} src_bytes={} src_rate={} src_channels={} "
+                    "src_rms={} out_bytes={} out_rate={} out_channels=1 out_rms={}",
+                    frame.user_id,
+                    len(frame.audio),
+                    frame.sample_rate,
+                    frame.num_channels,
+                    source_rms,
+                    len(normalized),
+                    self._target_sample_rate,
+                    normalized_rms,
+                )
+                self._debug_frames_remaining -= 1
+            await self.push_frame(
+                UserAudioRawFrame(
+                    user_id=frame.user_id,
+                    audio=normalized,
+                    sample_rate=self._target_sample_rate,
+                    num_channels=1,
+                ),
+                direction,
+            )
+            return
+
+        await self.push_frame(frame, direction)
+
+
+class DebugAssemblyAISTTService(AssemblyAISTTService):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._debug_chunks_remaining = int(os.getenv("STT_DEBUG_CHUNK_LOGS", "8"))
+
+    async def run_stt(self, audio: bytes):
+        if self._debug_chunks_remaining > 0:
+            logger.info(
+                "assembly enqueue bytes={} buffer_before={} chunk_size={} sample_rate={}",
+                len(audio),
+                len(self._audio_buffer),
+                self._chunk_size_bytes,
+                self.sample_rate,
+            )
+            self._debug_chunks_remaining -= 1
+        async for frame in super().run_stt(audio):
+            yield frame
 
 
 def issue_bot_token(
@@ -188,11 +278,21 @@ class TrustedLegPipecatBot:
             self._livekit_url,
             token,
             self._config.room_name,
+            params=LiveKitParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                audio_in_sample_rate=providers.assemblyai_sample_rate,
+                audio_out_sample_rate=24000,
+            ),
         )
-        stt = AssemblyAISTTService(
+        stt = DebugAssemblyAISTTService(
             api_key=providers.assemblyai_api_key,
-            sample_rate=16000,
-            settings=AssemblyAISTTSettings(language=self._config.source_language),
+            sample_rate=providers.assemblyai_sample_rate,
+            settings=AssemblyAISTTSettings(
+                language=self._config.source_language,
+                model=providers.assemblyai_speech_model,
+                language_detection=True,
+            ),
         )
         tts = CartesiaTTSService(
             api_key=providers.cartesia_api_key,
@@ -227,6 +327,9 @@ class TrustedLegPipecatBot:
         pipeline = Pipeline(
             [
                 transport.input(),
+                AudioNormalizeForSTTProcessor(
+                    target_sample_rate=providers.assemblyai_sample_rate
+                ),
                 stt,
                 TranslationProcessor(
                     config=TranslationPipelineConfig(
