@@ -52,6 +52,15 @@ dev = [
 [tool.uv]
 package = true
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast isolated tests",
+    "contract: tests for typed interfaces and payload contracts",
+    "integration: tests that require a running service or cross-component wiring",
+    "hardware: tests that require local models, macOS media tooling, or heavy runtime dependencies",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["levi_cli", "mac", "cloud"]
 

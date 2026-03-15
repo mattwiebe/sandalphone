@@ -27,6 +27,7 @@ A voice-first AI assistant focused on real-time Spanish/English translation, wit
 3. Configure and test!
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete setup guide.
+See [docs/testing.md](docs/testing.md) for the automated test matrix and opt-in integration/hardware suites.
 
 ## Architecture
 
