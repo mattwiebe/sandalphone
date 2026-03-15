@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from .config import load_runtime_cloud_config
@@ -50,3 +51,224 @@ def trusted_token(request: TrustedTokenRequest) -> dict[str, str]:
         "identity": request.identity,
         "livekit_url": config.livekit_url,
     }
+
+
+@app.post("/trusted/credentials")
+def trusted_credentials(request: TrustedTokenRequest) -> dict[str, str]:
+    config = load_runtime_cloud_config()
+    if not config.livekit_api_key or not config.livekit_api_secret:
+        raise HTTPException(status_code=503, detail="LiveKit credentials not configured")
+
+    token = issue_trusted_leg_token(
+        config=config,
+        room_name=request.room_name,
+        identity=request.identity,
+        name=request.name,
+    )
+    return {
+        "serverUrl": config.livekit_url,
+        "roomName": request.room_name,
+        "participantName": request.name or request.identity,
+        "participantIdentity": request.identity,
+        "participantToken": token,
+    }
+
+
+@app.get("/trusted", response_class=HTMLResponse)
+def trusted_page() -> str:
+    return """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Levi Trusted Leg</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        background: #f3efe6;
+        color: #1c1917;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top, rgba(245, 158, 11, 0.18), transparent 36%),
+          linear-gradient(180deg, #f8f3ea 0%, #efe6d7 100%);
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px 20px 48px;
+      }
+      .card {
+        background: rgba(255, 251, 235, 0.84);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(120, 53, 15, 0.12);
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: 0 24px 60px rgba(120, 53, 15, 0.12);
+      }
+      h1 {
+        font-size: clamp(2rem, 4vw, 3rem);
+        margin: 0 0 8px;
+      }
+      p {
+        line-height: 1.5;
+      }
+      form {
+        display: grid;
+        gap: 14px;
+        margin-top: 20px;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+      input {
+        border: 1px solid rgba(120, 53, 15, 0.18);
+        border-radius: 14px;
+        padding: 12px 14px;
+        font: inherit;
+        background: #fffdf8;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 18px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button[type="submit"] {
+        background: #0f766e;
+        color: white;
+      }
+      button[data-leave] {
+        background: #e7e5e4;
+        color: #1c1917;
+      }
+      #status {
+        margin-top: 18px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.72);
+        font-size: 0.95rem;
+      }
+      #participants {
+        margin-top: 18px;
+        padding-left: 20px;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.6/dist/livekit-client.umd.min.js"></script>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>Trusted Leg</h1>
+        <p>Join the LiveKit room for private translated audio. Use headphones or earbuds so the caller never hears the trusted-leg mix.</p>
+        <form id="join-form">
+          <label>
+            Room
+            <input id="room" name="room" value="call-main" />
+          </label>
+          <label>
+            Identity
+            <input id="identity" name="identity" value="trusted-matt" />
+          </label>
+          <label>
+            Name
+            <input id="name" name="name" value="Matt" />
+          </label>
+          <div class="actions">
+            <button type="submit">Join Room</button>
+            <button type="button" data-leave>Leave</button>
+          </div>
+        </form>
+        <div id="status">Idle.</div>
+        <ul id="participants"></ul>
+      </div>
+    </main>
+    <script>
+      const statusEl = document.getElementById("status");
+      const participantsEl = document.getElementById("participants");
+      const form = document.getElementById("join-form");
+      const leaveButton = document.querySelector("[data-leave]");
+      let room;
+
+      function setStatus(message) {
+        statusEl.textContent = message;
+      }
+
+      function renderParticipants() {
+        if (!room) {
+          participantsEl.innerHTML = "";
+          return;
+        }
+        const items = [...room.remoteParticipants.values()].map((participant) => {
+          return `<li>${participant.identity}</li>`;
+        });
+        participantsEl.innerHTML = items.join("");
+      }
+
+      function attachAudio(track) {
+        const element = track.attach();
+        element.autoplay = true;
+        element.playsInline = true;
+        document.body.appendChild(element);
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setStatus("Requesting LiveKit token...");
+        if (room) {
+          await room.disconnect();
+        }
+
+        const payload = {
+          room_name: document.getElementById("room").value,
+          identity: document.getElementById("identity").value,
+          name: document.getElementById("name").value,
+        };
+        const response = await fetch("/trusted/credentials", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const credentials = await response.json();
+        room = new LivekitClient.Room();
+        room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+          if (track.kind === "audio") {
+            attachAudio(track);
+          }
+        });
+        room.on(LivekitClient.RoomEvent.ParticipantConnected, renderParticipants);
+        room.on(LivekitClient.RoomEvent.ParticipantDisconnected, renderParticipants);
+        room.on(LivekitClient.RoomEvent.Disconnected, () => {
+          setStatus("Disconnected.");
+          renderParticipants();
+        });
+
+        await room.connect(credentials.serverUrl, credentials.participantToken);
+        renderParticipants();
+        setStatus(`Connected to ${credentials.roomName} as ${credentials.participantIdentity}.`);
+      });
+
+      leaveButton.addEventListener("click", async () => {
+        if (room) {
+          await room.disconnect();
+          room = null;
+        }
+        setStatus("Disconnected.");
+        renderParticipants();
+      });
+    </script>
+  </body>
+</html>"""

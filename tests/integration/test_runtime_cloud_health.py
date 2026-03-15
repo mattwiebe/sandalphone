@@ -21,3 +21,13 @@ def test_runtime_cloud_health_reports_missing_livekit_config(monkeypatch: pytest
 
     assert response.status_code == 200
     assert response.json()["status"] == "degraded"
+
+
+@pytest.mark.integration
+def test_trusted_page_is_served() -> None:
+    client = TestClient(app)
+    response = client.get("/trusted")
+
+    assert response.status_code == 200
+    assert "Trusted Leg" in response.text
+    assert "livekit-client.umd.min.js" in response.text
