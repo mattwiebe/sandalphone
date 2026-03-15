@@ -2,29 +2,30 @@
 
 A voice-first AI assistant focused on real-time Spanish/English translation, with plans to expand into a full personal assistant for restaurant operations and daily tasks.
 
-## Project Status: Phase 2 - Ready for Deployment! 🚀
+## Project Status
 
-**What's Working:**
-- ✅ **Phase 1**: Local translation pipeline (STT → Translation → TTS)
-- ✅ **Phase 2**: WebSocket server + Telegram bot (ready to deploy!)
+The repo has been pivoted toward:
 
-**Components:**
-- ✅ Whisper.cpp with Metal acceleration (16x real-time on M4 Max)
-- ✅ Qwen2.5-7B-Instruct (4-bit quantized) for translation
-- ✅ FastAPI WebSocket server for remote access
-- ✅ Telegram bot with voice message handling
-- ✅ Tailscale setup for secure Mac ↔ Cloud connection
+- `Pipecat` as the realtime orchestration layer
+- `LiveKit Cloud` as the media plane and SIP integration layer
+- the existing `mac/` inference stack behind typed adapters
+- private translation as the default listening mode
 
-**Performance on M4 Max:**
-- **Transcription**: ~500ms for 11s audio (21.8x real-time)
-- **Translation**: ~1.5s for typical sentences
-- **TTS**: ~200ms (macOS `say` placeholder)
-- **WebSocket round-trip**: 2.2s total latency ⚡
+What is implemented in the codebase now:
 
-**Next Steps:**
-1. Set up Tailscale and get your Mac's IP
-2. Create Telegram bot via @BotFather
-3. Configure and test!
+- typed STT / translation / TTS adapter boundary
+- typed session, transcript, and task event contracts
+- Pipecat-facing runtime skeleton for private translation and ambient mode
+- LiveKit room policy, participant-role mapping, and reconnect handling
+- inbound and outbound SIP domain models on the same room/session shape
+- audio policy and basic operability modules
+- automated unit / contract / integration coverage for the new runtime surface
+
+What is still transitional:
+
+- the old websocket and Telegram paths still exist in the repo
+- the FastAPI server and legacy orchestration have not been fully removed
+- LiveKit/Pipecat server connectivity is modeled locally, not fully wired end-to-end yet
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete setup guide.
 See [docs/testing.md](docs/testing.md) for the automated test matrix and opt-in integration/hardware suites.
@@ -32,17 +33,13 @@ See [docs/testing.md](docs/testing.md) for the automated test matrix and opt-in 
 ## Architecture
 
 ```
-Current (Local Testing):
-[Audio File] → [Whisper STT] → [Qwen Translation] → [TTS] → [Audio Output]
-                    ↓                    ↓                ↓
-              Metal-accelerated    MLX-optimized    Placeholder (macOS say)
-```
-
-```
-Planned (Phase 2 - Cloud Integration):
-[iPhone] → [Telegram] → [Cloud VPS] → [Cloudflare Tunnel] → [Mac M4 Max]
-                                                                    ↓
-                                                        [Translation Pipeline]
+[PSTN/SIP Provider] → [LiveKit Cloud] → [LiveKit Room]
+                                          ↓
+                                [Pipecat Runtime / Policy]
+                                          ↓
+                            [Typed Translation Adapter Boundary]
+                                          ↓
+                                   [mac/ inference stack]
 ```
 
 ## Quick Start
@@ -125,65 +122,51 @@ audio_file = tts.synthesize(translation, language="en")
 
 ```
 levi/
-├── mac/                          # Mac M4 backend
+├── mac/                          # Mac inference backend and adapters
 │   ├── src/
+│   │   ├── levi_pipeline/            # Typed translation pipeline boundary
 │   │   ├── stt/
-│   │   │   └── whisper_client.py    # Whisper.cpp wrapper
 │   │   ├── llm/
-│   │   │   └── translation_client.py # Qwen translation
 │   │   ├── tts/
-│   │   │   └── qwen_tts_client.py   # TTS client
-│   │   └── translation_service.py    # Main pipeline
-│   ├── models/
-│   │   ├── whisper.cpp/              # Whisper with Metal
-│   │   ├── qwen-7b-4bit/             # Translation LLM
-│   │   └── qwen3-tts-0.6b/           # TTS model
-│   └── config/
-├── cloud/                        # Cloud orchestrator (Phase 2)
-├── scripts/                      # Setup scripts
-├── shared/                       # Shared protocol definitions
-└── venv/                         # Python virtual environment
+│   │   ├── translation_service.py
+│   │   └── streaming_translation_service.py
+├── cloud/
+│   └── src/
+│       └── pipecat_app/              # Pipecat/LiveKit-facing runtime surface
+├── tests/
+│   ├── unit/
+│   ├── contract/
+│   └── integration/
+├── docs/
+└── scripts/
 ```
 
 ## Roadmap
 
-### Phase 1: Local Translation Pipeline ✅ COMPLETE
-- [x] Set up Whisper.cpp with Metal
-- [x] Download and test Qwen translation model
-- [x] Download Qwen3-TTS model
-- [x] Create translation service pipeline
-- [x] Test end-to-end locally
+### Complete
+- [x] Phase 0: test harness, markers, and baseline suite
+- [x] Phase 1: typed adapter contracts around the Mac inference stack
+- [x] Phase 2: Pipecat-facing runtime skeleton and event contracts
+- [x] Phase 3: LiveKit room model, role mapping, and reconnect policy
+- [x] Phase 4: inbound SIP session/config model
+- [x] Phase 5: outbound SIP session/config model
+- [x] Phase 6: audio policy
+- [x] Phase 7: operability primitives
 
-### Phase 2: Cloud Integration (Next 2 weeks)
-- [ ] Create FastAPI WebSocket server on Mac
-- [ ] Set up Cloudflare Tunnel
-- [ ] Provision Hetzner VPS ($4/month)
-- [ ] Create Telegram bot
-- [ ] Implement Pipecat voice pipeline
-- [ ] Test remote translation via Telegram
-
-### Phase 3: Production (Week 4-5)
-- [ ] Add conversation state management
-- [ ] Implement audio archival (SQLite + M4A)
-- [ ] Add monitoring and health checks
-- [ ] Optimize latency (<3 seconds target)
-- [ ] Real-world testing with Spanish speakers
-
-### Phase 4: Advanced Features (Future)
-- [ ] Voice commands for mode switching
-- [ ] MoltBot integration
-- [ ] Mac automation with MCP
-- [ ] Restaurant operations features
+### Remaining
+- [ ] Phase 8: remove or isolate more legacy orchestration paths
+- [ ] wire the runtime to real LiveKit/Pipecat connectivity end to end
+- [ ] replace transitional Telegram/websocket paths or move them behind explicit compatibility boundaries
+- [ ] add production deployment wiring and real call-flow integration tests
 
 ## Technology Stack
 
 - **STT**: Whisper.cpp (base model, Metal-accelerated)
 - **Translation**: Qwen2.5-7B-Instruct (MLX 4-bit quantized)
-- **TTS**: Qwen3-TTS 0.6B (placeholder: macOS `say`)
-- **LLM Runtime**: MLX + vllm-mlx
-- **Web Framework**: FastAPI + Uvicorn
-- **Cloud**: Hetzner VPS + Cloudflare Tunnel
-- **Messaging**: Telegram Bot API
+- **TTS**: Qwen3-TTS 0.6B / VibeVoice with fallback support
+- **Realtime Orchestration**: Pipecat
+- **Media / SIP Plane**: LiveKit Cloud + LiveKit Agents
+- **Legacy Compatibility**: FastAPI WebSocket server and Telegram bot
 
 ## Cost Breakdown
 
