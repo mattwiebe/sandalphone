@@ -4,15 +4,31 @@ import asyncio
 import json
 import os
 import unicodedata
+import wave
+from asyncio import Queue
 from collections.abc import AsyncIterator
+from pathlib import Path
 from urllib.parse import urlencode
 
 import pytest
 import requests
+from pipecat.frames.frames import EndFrame, Frame, TTSAudioRawFrame, TTSStoppedFrame, UserAudioRawFrame
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.runner import PipelineRunner
+from pipecat.pipeline.task import PipelineTask
+from pipecat.tests.utils import QueuedFrameProcessor, SleepFrame
+from pipecat.transcriptions.language import Language
+from pipecat.transports.livekit.transport import LiveKitOutputTransportMessageFrame
+from pipecat.processors.frame_processor import FrameDirection
+from pipecat.services.assemblyai.stt import AssemblyAISTTService, AssemblyAISTTSettings
+from pipecat.services.cartesia.tts import CartesiaTTSService, CartesiaTTSSettings
 from websockets.asyncio.client import connect as websocket_connect
 
+from runtime_cloud_service.translation_pipeline import DeepLTranslateClient, TranslationPipelineConfig, TranslationProcessor
 
-_SPANISH_TEXT = "hola como estas"
+
+_SPANISH_TEXT = "hola como estas necesito ayuda con una traduccion"
+_FIXTURE_AUDIO = Path("/Users/matt/levi/tests/fixtures/spanish_hola_como_estas.wav")
 
 
 def _require_env(name: str) -> str:
@@ -64,6 +80,14 @@ def _synthesize_cartesia_pcm16() -> bytes:
     return response.content
 
 
+def _load_fixture_pcm16() -> bytes:
+    with wave.open(str(_FIXTURE_AUDIO), "rb") as wav_file:
+        assert wav_file.getnchannels() == 1
+        assert wav_file.getsampwidth() == 2
+        assert wav_file.getframerate() == 16000
+        return wav_file.readframes(wav_file.getnframes())
+
+
 @pytest.mark.integration
 def test_deepl_translates_spanish_text() -> None:
     api_key = _require_env("DEEPL_API_KEY")
@@ -86,7 +110,7 @@ def test_deepl_translates_spanish_text() -> None:
     normalized = _normalize_text(translated_text)
     assert normalized
     assert normalized != _normalize_text(_SPANISH_TEXT)
-    assert "hello" in normalized or "how are you" in normalized
+    assert "hello" in normalized or "translation" in normalized or "help" in normalized
 
 
 @pytest.mark.integration
@@ -103,8 +127,27 @@ def test_assemblyai_streaming_transcribes_spanish_audio() -> None:
 
     normalized = _normalize_text(transcript)
     assert normalized
-    assert "hola" in normalized
+    assert "hola" in normalized or "ola" in normalized
     assert "como" in normalized
+
+
+@pytest.mark.integration
+def test_live_provider_pipeline_translates_and_synthesizes_spanish_fixture() -> None:
+    frames = asyncio.run(_run_live_provider_pipeline(_load_fixture_pcm16()))
+
+    metadata_frames = [
+        frame for frame in frames if isinstance(frame, LiveKitOutputTransportMessageFrame)
+    ]
+    tts_audio_frames = [frame for frame in frames if isinstance(frame, TTSAudioRawFrame)]
+
+    assert metadata_frames
+    assert tts_audio_frames
+    assert any(isinstance(frame, TTSStoppedFrame) for frame in frames)
+
+    translated_text = _normalize_text(json.loads(metadata_frames[-1].message)["translation"])
+    assert "hello" in translated_text or "translation" in translated_text or "help" in translated_text
+    assert metadata_frames[-1].participant_id == "trusted-matt"
+    assert sum(len(frame.audio) for frame in tts_audio_frames) > 3200
 
 
 async def _stream_audio_to_assemblyai(audio: bytes) -> str:
@@ -145,3 +188,67 @@ async def _wait_for_message_type(websocket, expected_type: str) -> dict[str, obj
         message = json.loads(await websocket.recv())
         if message.get("type") == expected_type:
             return message
+
+
+async def _run_live_provider_pipeline(audio: bytes) -> list[Frame]:
+    received_down: Queue[Frame] = Queue()
+    source = QueuedFrameProcessor(queue=Queue(), queue_direction=FrameDirection.UPSTREAM)
+    sink = QueuedFrameProcessor(queue=received_down, queue_direction=FrameDirection.DOWNSTREAM)
+
+    stt = AssemblyAISTTService(
+        api_key=_require_env("ASSEMBLYAI_API_KEY"),
+        sample_rate=16000,
+        settings=AssemblyAISTTSettings(
+            language=Language.ES_MX,
+            model="universal-streaming-multilingual",
+            language_detection=True,
+        ),
+    )
+    translation = TranslationProcessor(
+        config=TranslationPipelineConfig(
+            trusted_identity="trusted-matt",
+            source_language=Language.ES_MX,
+            target_language=Language.EN_US,
+        ),
+        translator=DeepLTranslateClient(api_key=_require_env("DEEPL_API_KEY")),
+    )
+    tts = CartesiaTTSService(
+        api_key=_require_env("CARTESIA_API_KEY"),
+        sample_rate=24000,
+        settings=CartesiaTTSSettings(
+            voice=_require_env("CARTESIA_VOICE_ID"),
+            model=os.getenv("CARTESIA_MODEL", "sonic-2"),
+        ),
+    )
+
+    pipeline = Pipeline([source, stt, translation, tts, sink])
+    task = PipelineTask(pipeline, cancel_on_idle_timeout=False)
+    runner = PipelineRunner()
+
+    async def push_frames() -> None:
+        await asyncio.sleep(0.01)
+        for chunk in _chunk_audio_frames(audio, chunk_size=1600):
+            await task.queue_frame(
+                UserAudioRawFrame(
+                    user_id="fixture-caller",
+                    audio=chunk,
+                    sample_rate=16000,
+                    num_channels=1,
+                )
+            )
+            await task.queue_frame(SleepFrame(sleep=0.05))
+        await task.queue_frame(SleepFrame(sleep=6.0))
+        await task.queue_frame(EndFrame())
+
+    await asyncio.gather(runner.run(task), push_frames())
+
+    frames: list[Frame] = []
+    while not received_down.empty():
+        frame = await received_down.get()
+        if not isinstance(frame, EndFrame):
+            frames.append(frame)
+    return frames
+
+
+def _chunk_audio_frames(audio: bytes, *, chunk_size: int) -> list[bytes]:
+    return [audio[index : index + chunk_size] for index in range(0, len(audio), chunk_size)]

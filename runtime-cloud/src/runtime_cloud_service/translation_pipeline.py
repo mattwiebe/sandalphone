@@ -85,8 +85,6 @@ def build_translation_output_frames(
 ) -> list[object]:
     if isinstance(transcription, InterimTranscriptionFrame):
         return []
-    if not transcription.finalized:
-        return []
 
     translated_text = translator.translate(
         transcription.text,

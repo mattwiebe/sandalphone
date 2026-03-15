@@ -49,6 +49,31 @@ def test_translation_output_frames_include_private_message_and_tts() -> None:
     assert frames[2].text == "hello there"
 
 
+def test_transcription_frames_emit_output_even_without_finalize_hint() -> None:
+    translator = _FakeTranslator()
+    config = TranslationPipelineConfig(
+        trusted_identity="trusted-matt",
+        source_language=Language.ES_MX,
+        target_language=Language.EN_US,
+    )
+    transcription = TranscriptionFrame(
+        text="hola",
+        user_id="sip-participant-1",
+        timestamp="2026-03-15T06:00:00Z",
+        language=Language.ES_MX,
+        finalized=False,
+    )
+
+    frames = build_translation_output_frames(
+        config=config,
+        transcription=transcription,
+        translator=translator,
+    )
+
+    assert translator.calls == [("hola", Language.ES_MX, Language.EN_US)]
+    assert len(frames) == 3
+
+
 def test_interim_transcriptions_do_not_emit_output() -> None:
     translator = _FakeTranslator()
     config = TranslationPipelineConfig(

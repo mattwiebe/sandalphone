@@ -37,6 +37,7 @@ node_modules/
 
 # Audio files
 *.wav
+!tests/fixtures/spanish_hola_como_estas.wav
 *.mp3
 *.m4a
 *.ogg
