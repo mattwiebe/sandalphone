@@ -11,6 +11,8 @@ from typing import Generator, Dict, Any, Optional
 sys.path.insert(0, str(Path(__file__).parent))
 
 from stt.whisper_client import WhisperClient
+from levi_pipeline.models import AudioChunkResult, TranslationMetadata
+from levi_pipeline.service import StreamingTranslationPipeline
 from llm.translation_factory import create_translation_client
 from tts.factory import create_tts_provider
 
@@ -49,6 +51,12 @@ class StreamingTranslationService:
 
             print("✓ Streaming Translation Service ready!")
 
+        self.pipeline = StreamingTranslationPipeline(
+            stt=self.stt,
+            translator=self.translator,
+            tts=self.tts,
+        )
+
     def translate_audio_streaming(
         self,
         input_audio,
@@ -82,62 +90,31 @@ class StreamingTranslationService:
 
         # Step 1: Transcribe audio
         print(f"\n[1/3] Transcribing audio ({source_lang})...")
-        transcription = self.stt.transcribe(input_audio, language=source_lang)
-        print(f'      Transcribed: "{transcription}"')
-
-        # Step 2: Translate text
+        print(f"\n[1/3] Transcribing audio ({source_lang})...")
         print(f"\n[2/3] Translating {source_lang} → {target_lang}...")
-        translation = self.translator.translate(transcription, source_lang, target_lang)
-        print(f'      Translated: "{translation}"')
-
-        # Yield metadata first
-        yield {
-            "type": "metadata",
-            "transcription": transcription,
-            "translation": translation,
-        }
-
-        # Step 3: Stream TTS output
         print(f"\n[3/3] Streaming speech ({target_lang})...")
 
-        # Check if TTS provider supports streaming
-        if hasattr(self.tts, 'synthesize_streaming'):
-            chunk_index = 0
-            for audio_chunk in self.tts.synthesize_streaming(
-                text=translation,
-                language=target_lang,
-                streaming_interval=streaming_interval
-            ):
-                print(f"      Chunk {chunk_index}: {len(audio_chunk)} bytes")
-                yield {
-                    "type": "audio_chunk",
-                    "data": audio_chunk,
-                    "chunk_index": chunk_index,
-                }
-                chunk_index += 1
+        chunk_count = 0
+        for event in self.pipeline.translate(
+            input_audio=input_audio,
+            source_lang=source_lang,
+            target_lang=target_lang,
+            streaming_interval=streaming_interval,
+        ):
+            if isinstance(event, TranslationMetadata):
+                print(f'      Transcribed: "{event.transcription}"')
+                print(f'      Translated: "{event.translation}"')
+                yield event.to_dict()
+                continue
 
-            print(f"\n{'=' * 60}")
-            print(f"✓ STREAMING TRANSLATION COMPLETE ({chunk_index} chunks)")
-            print(f"{'=' * 60}\n")
+            assert isinstance(event, AudioChunkResult)
+            print(f"      Chunk {event.chunk_index}: {len(event.data)} bytes")
+            yield event.to_dict()
+            chunk_count += 1
 
-        else:
-            # Fallback to non-streaming
-            print("      TTS provider doesn't support streaming, using batch mode...")
-            audio_file = self.tts.synthesize(translation, language=target_lang)
-
-            # Read the entire file and yield as single chunk
-            with open(audio_file, "rb") as f:
-                audio_data = f.read()
-
-            yield {
-                "type": "audio_chunk",
-                "data": audio_data,
-                "chunk_index": 0,
-            }
-
-            print(f"\n{'=' * 60}")
-            print(f"✓ TRANSLATION COMPLETE (batch mode)")
-            print(f"{'=' * 60}\n")
+        print(f"\n{'=' * 60}")
+        print(f"✓ STREAMING TRANSLATION COMPLETE ({chunk_count} chunks)")
+        print(f"{'=' * 60}\n")
 
 
 def main():

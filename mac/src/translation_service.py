@@ -15,6 +15,8 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 from stt.whisper_client import WhisperClient
+from levi_pipeline.models import TranslationResult
+from levi_pipeline.service import BatchTranslationPipeline
 from llm.translation_factory import create_translation_client
 from tts.factory import create_tts_provider
 
@@ -51,9 +53,15 @@ class TranslationService:
 
             print("✓ Translation Service ready!")
 
+        self.pipeline = BatchTranslationPipeline(
+            stt=self.stt,
+            translator=self.translator,
+            tts=self.tts,
+        )
+
     def translate_audio(
         self, input_audio, source_lang="es", target_lang="en", output_audio=None
-    ):
+    ) -> TranslationResult:
         """
         Full pipeline: Audio → Transcribe → Translate → Synthesize → Audio
 
@@ -72,30 +80,30 @@ class TranslationService:
 
         # Step 1: Transcribe audio
         print(f"\n[1/3] Transcribing audio ({source_lang})...")
-        transcription = self.stt.transcribe(input_audio, language=source_lang)
+        result = self.pipeline.translate(
+            input_audio=input_audio,
+            source_lang=source_lang,
+            target_lang=target_lang,
+            output_audio=output_audio,
+        )
+        transcription = result.transcription
         print(f'      Transcribed: "{transcription}"')
 
         # Step 2: Translate text
         print(f"\n[2/3] Translating {source_lang} → {target_lang}...")
-        translation = self.translator.translate(transcription, source_lang, target_lang)
+        translation = result.translation
         print(f'      Translated: "{translation}"')
 
         # Step 3: Synthesize translated text with voice cloning
         print(f"\n[3/3] Synthesizing speech ({target_lang})...")
-        output_audio_path = self.tts.synthesize(
-            text=translation, output_file=output_audio, language=target_lang
-        )
+        output_audio_path = result.output_audio
         print(f"      Audio generated: {output_audio_path}")
 
         print(f"\n{'=' * 60}")
         print(f"✓ TRANSLATION COMPLETE")
         print(f"{'=' * 60}\n")
 
-        return {
-            "transcription": transcription,
-            "translation": translation,
-            "output_audio": str(output_audio_path),
-        }
+        return result
 
 
 def main():
@@ -120,13 +128,13 @@ def main():
     )
 
     print("\nResult:")
-    print(f"  Original (EN): {result['transcription']}")
-    print(f"  Translation (ES): {result['translation']}")
-    print(f"  Audio file: {result['output_audio']}")
+    print(f"  Original (EN): {result.transcription}")
+    print(f"  Translation (ES): {result.translation}")
+    print(f"  Audio file: {result.output_audio}")
 
     # Play the translated audio
     print("\nPlaying translated Spanish audio...")
-    subprocess.run(["afplay", result["output_audio"]])
+    subprocess.run(["afplay", str(result.output_audio)])
 
 
 if __name__ == "__main__":

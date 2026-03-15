@@ -137,7 +137,7 @@ async def websocket_translate(websocket: WebSocket):
                 )
 
                 # Read output audio and encode
-                with open(result["output_audio"], "rb") as f:
+                with open(result.output_audio, "rb") as f:
                     output_audio_data = f.read()
                 output_audio_b64 = base64.b64encode(output_audio_data).decode('utf-8')
 
@@ -147,21 +147,21 @@ async def websocket_translate(websocket: WebSocket):
                 # Send response
                 response = {
                     "status": "success",
-                    "transcription": result["transcription"],
-                    "translation": result["translation"],
+                    "transcription": result.transcription,
+                    "translation": result.translation,
                     "audio": output_audio_b64,
                     "latency_ms": latency_ms
                 }
 
                 print(f"✅ Translation completed in {latency_ms}ms")
-                print(f"   Original: {result['transcription'][:50]}...")
-                print(f"   Translated: {result['translation'][:50]}...")
+                print(f"   Original: {result.transcription[:50]}...")
+                print(f"   Translated: {result.translation[:50]}...")
 
                 await websocket.send_text(json.dumps(response))
 
                 # Cleanup temp files BEFORE deleting result
                 temp_audio_file = Path(temp_audio_path)
-                output_audio_file = Path(result["output_audio"])
+                output_audio_file = Path(result.output_audio)
                 temp_audio_file.unlink(missing_ok=True)
                 output_audio_file.unlink(missing_ok=True)
 
