@@ -3,7 +3,7 @@ from livekit import api
 from .config import RuntimeCloudConfig
 
 
-def issue_trusted_leg_token(
+def issue_room_participant_token(
     config: RuntimeCloudConfig,
     room_name: str,
     identity: str,
@@ -24,3 +24,12 @@ def issue_trusted_leg_token(
         )
     )
     return token.to_jwt()
+
+
+def issue_trusted_leg_token(
+    config: RuntimeCloudConfig,
+    room_name: str,
+    identity: str,
+    name: str | None = None,
+) -> str:
+    return issue_room_participant_token(config, room_name, identity, name)

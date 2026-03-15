@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from .bot_manager import InMemoryBotManager
 from .config import load_runtime_cloud_config
-from .tokens import issue_trusted_leg_token
+from .tokens import issue_room_participant_token, issue_trusted_leg_token
 
 
 app = FastAPI(title="Levi Runtime Cloud")
@@ -84,6 +84,27 @@ def trusted_credentials(request: TrustedTokenRequest) -> dict[str, str]:
         raise HTTPException(status_code=503, detail="LiveKit credentials not configured")
 
     token = issue_trusted_leg_token(
+        config=config,
+        room_name=request.room_name,
+        identity=request.identity,
+        name=request.name,
+    )
+    return {
+        "serverUrl": config.livekit_url,
+        "roomName": request.room_name,
+        "participantName": request.name or request.identity,
+        "participantIdentity": request.identity,
+        "participantToken": token,
+    }
+
+
+@app.post("/caller/credentials")
+def caller_credentials(request: TrustedTokenRequest) -> dict[str, str]:
+    config = load_runtime_cloud_config()
+    if not config.livekit_api_key or not config.livekit_api_secret:
+        raise HTTPException(status_code=503, detail="LiveKit credentials not configured")
+
+    token = issue_room_participant_token(
         config=config,
         room_name=request.room_name,
         identity=request.identity,
@@ -293,6 +314,196 @@ def trusted_page() -> str:
         setStatus("Disconnected.");
         renderParticipants();
       });
+    </script>
+  </body>
+</html>"""
+
+
+@app.get("/caller", response_class=HTMLResponse)
+def caller_page() -> str:
+    return """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Levi Caller Simulator</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        background: #eef6ff;
+        color: #0f172a;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top, rgba(14, 165, 233, 0.2), transparent 34%),
+          linear-gradient(180deg, #f7fbff 0%, #dbeafe 100%);
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px 20px 48px;
+      }
+      .card {
+        background: rgba(239, 246, 255, 0.9);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(30, 64, 175, 0.14);
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: 0 24px 60px rgba(30, 64, 175, 0.14);
+      }
+      h1 {
+        font-size: clamp(2rem, 4vw, 3rem);
+        margin: 0 0 8px;
+      }
+      p {
+        line-height: 1.5;
+      }
+      form {
+        display: grid;
+        gap: 14px;
+        margin-top: 20px;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+      input {
+        border: 1px solid rgba(30, 64, 175, 0.18);
+        border-radius: 14px;
+        padding: 12px 14px;
+        font: inherit;
+        background: #fff;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 18px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button[type="submit"] {
+        background: #1d4ed8;
+        color: white;
+      }
+      button[data-leave] {
+        background: #dbeafe;
+        color: #0f172a;
+      }
+      #status {
+        margin-top: 18px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.8);
+        font-size: 0.95rem;
+      }
+      #participants {
+        margin-top: 18px;
+        padding-left: 20px;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.6/dist/livekit-client.umd.min.js"></script>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>Caller Simulator</h1>
+        <p>Use this page instead of Twilio to act like the incoming caller. It joins the LiveKit room, publishes your microphone, and lets the trusted leg hear translated audio without PSTN charges.</p>
+        <form id="join-form">
+          <label>
+            Room
+            <input id="room" name="room" value="call-main" />
+          </label>
+          <label>
+            Identity
+            <input id="identity" name="identity" value="web-caller" />
+          </label>
+          <label>
+            Name
+            <input id="name" name="name" value="Web Caller" />
+          </label>
+          <div class="actions">
+            <button type="submit">Join As Caller</button>
+            <button type="button" data-leave>Leave</button>
+          </div>
+        </form>
+        <div id="status">Idle.</div>
+        <ul id="participants"></ul>
+      </div>
+    </main>
+    <script>
+      const statusEl = document.getElementById("status");
+      const participantsEl = document.getElementById("participants");
+      const form = document.getElementById("join-form");
+      const leaveButton = document.querySelector("[data-leave]");
+      let room;
+
+      function setStatus(message) {
+        statusEl.textContent = message;
+      }
+
+      function renderParticipants() {
+        if (!room) {
+          participantsEl.innerHTML = "";
+          return;
+        }
+        const names = [room.localParticipant.identity, ...[...room.remoteParticipants.values()].map((participant) => participant.identity)];
+        participantsEl.innerHTML = names.map((name) => `<li>${name}</li>`).join("");
+      }
+
+      async function leaveRoom() {
+        if (room) {
+          await room.disconnect();
+          room = null;
+        }
+        setStatus("Disconnected.");
+        renderParticipants();
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await leaveRoom();
+        setStatus("Requesting LiveKit token...");
+
+        const payload = {
+          room_name: document.getElementById("room").value,
+          identity: document.getElementById("identity").value,
+          name: document.getElementById("name").value,
+        };
+        const response = await fetch("/caller/credentials", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const credentials = await response.json();
+        room = new LivekitClient.Room({
+          adaptiveStream: true,
+          dynacast: true,
+        });
+        room.on(LivekitClient.RoomEvent.ParticipantConnected, renderParticipants);
+        room.on(LivekitClient.RoomEvent.ParticipantDisconnected, renderParticipants);
+        room.on(LivekitClient.RoomEvent.Disconnected, () => {
+          setStatus("Disconnected.");
+          renderParticipants();
+        });
+
+        await room.connect(credentials.serverUrl, credentials.participantToken);
+        await room.localParticipant.enableCameraAndMicrophone(false, true);
+        renderParticipants();
+        setStatus(`Connected to ${credentials.roomName} as ${credentials.participantIdentity}. Mic is live.`);
+      });
+
+      leaveButton.addEventListener("click", leaveRoom);
     </script>
   </body>
 </html>"""
