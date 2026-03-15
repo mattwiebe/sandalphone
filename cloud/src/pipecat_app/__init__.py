@@ -23,9 +23,13 @@ from .livekit_outbound import (
     build_outbound_session,
     validate_outbound_dial_request,
 )
+from .audio_policy import AudioMode, AudioPolicy, AudioPolicyConfig, MixPlan
 
 __all__ = [
     "AudioSource",
+    "AudioMode",
+    "AudioPolicy",
+    "AudioPolicyConfig",
     "LiveKitParticipant",
     "LiveKitRoomPolicy",
     "LiveKitSessionController",
@@ -42,6 +46,7 @@ __all__ = [
     "RoomRole",
     "SessionState",
     "TrackPublication",
+    "MixPlan",
     "build_outbound_session",
     "create_inbound_session",
     "parse_inbound_call_context",
