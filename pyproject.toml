@@ -2,7 +2,7 @@
 name = "levi"
 version = "0.2.0"
 description = "Voice-Driven AI Assistant for Spanish/English Translation"
-requires-python = ">=3.13"
+requires-python = ">=3.12,<3.13"
 
 dependencies = [
     "websockets>=12.0",
