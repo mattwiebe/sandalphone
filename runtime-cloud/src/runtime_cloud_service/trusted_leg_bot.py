@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -17,9 +18,13 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.services.google.stt import GoogleSTTService
+from pipecat.services.google.tts import GoogleTTSService
 from pipecat.transcriptions.language import Language
 from pipecat.transports.livekit.transport import LiveKitOutputTransportMessageFrame
 from pipecat.transports.livekit.transport import LiveKitTransport
+
+from .translation_pipeline import GoogleTranslateClient, TranslationPipelineConfig, TranslationProcessor
 
 
 class TextTranslator(Protocol):
@@ -159,6 +164,14 @@ class TrustedLegPipecatBot:
             token,
             self._config.room_name,
         )
+        stt = GoogleSTTService(
+            sample_rate=16000,
+        )
+        tts = GoogleTTSService(
+            voice_id=os.getenv("GOOGLE_TTS_VOICE"),
+            sample_rate=24000,
+        )
+        translator = GoogleTranslateClient()
 
         @transport.event_handler("on_connected")
         async def on_connected(_transport: LiveKitTransport) -> None:
@@ -183,6 +196,16 @@ class TrustedLegPipecatBot:
         pipeline = Pipeline(
             [
                 transport.input(),
+                stt,
+                TranslationProcessor(
+                    config=TranslationPipelineConfig(
+                        trusted_identity=self._config.trusted_identity,
+                        source_language=self._config.source_language,
+                        target_language=self._config.target_language,
+                    ),
+                    translator=translator,
+                ),
+                tts,
                 DropInputFramesProcessor(),
                 transport.output(),
             ]

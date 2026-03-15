@@ -4,6 +4,8 @@ import asyncio
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Protocol
 
+from loguru import logger
+
 
 class ManagedBot(Protocol):
     async def run(self) -> None: ...
@@ -36,9 +38,19 @@ class InMemoryBotManager:
                 running=not task.done(),
             )
 
-        bot = self._factory(room_name, trusted_identity)
-        task = asyncio.create_task(bot.run(), name=f"trusted-leg-bot:{room_name}")
-        self._bots[room_name] = (trusted_identity, bot, task)
+        sentinel = _PendingBot()
+
+        async def run_bot() -> None:
+            try:
+                bot = self._factory(room_name, trusted_identity)
+                self._bots[room_name] = (trusted_identity, bot, task)
+                await bot.run()
+            except Exception:
+                logger.exception("trusted leg bot failed", room_name=room_name)
+                raise
+
+        task = asyncio.create_task(run_bot(), name=f"trusted-leg-bot:{room_name}")
+        self._bots[room_name] = (trusted_identity, sentinel, task)
         task.add_done_callback(lambda _: self._bots.pop(room_name, None))
         return BotStatus(
             room_name=room_name,
@@ -66,3 +78,11 @@ class InMemoryBotManager:
             )
         result.sort(key=lambda item: str(item["room_name"]))
         return result
+
+
+class _PendingBot:
+    async def run(self) -> None:
+        return None
+
+    async def stop(self) -> None:
+        return None
