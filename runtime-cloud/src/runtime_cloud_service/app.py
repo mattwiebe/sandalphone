@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from .bot_manager import InMemoryBotManager
 from .config import load_runtime_cloud_config
 from .tokens import issue_trusted_leg_token
 
@@ -9,10 +10,33 @@ from .tokens import issue_trusted_leg_token
 app = FastAPI(title="Levi Runtime Cloud")
 
 
+def _create_bot(room_name: str, trusted_identity: str):
+    from .trusted_leg_bot import TrustedLegBotConfig, TrustedLegPipecatBot
+
+    config = load_runtime_cloud_config()
+    return TrustedLegPipecatBot(
+        livekit_url=config.livekit_url,
+        api_key=config.livekit_api_key,
+        api_secret=config.livekit_api_secret,
+        config=TrustedLegBotConfig(
+            room_name=room_name,
+            trusted_identity=trusted_identity,
+        ),
+    )
+
+
+app.state.bot_manager = InMemoryBotManager(_create_bot)
+
+
 class TrustedTokenRequest(BaseModel):
     room_name: str
     identity: str
     name: str | None = None
+
+
+class BotStartRequest(BaseModel):
+    room_name: str
+    trusted_identity: str
 
 
 @app.get("/health")
@@ -272,3 +296,25 @@ def trusted_page() -> str:
     </script>
   </body>
 </html>"""
+
+
+@app.post("/bot/start")
+async def start_bot(request: BotStartRequest) -> dict[str, object]:
+    config = load_runtime_cloud_config()
+    if not config.livekit_api_key or not config.livekit_api_secret:
+        raise HTTPException(status_code=503, detail="LiveKit credentials not configured")
+
+    status = await app.state.bot_manager.start(
+        room_name=request.room_name,
+        trusted_identity=request.trusted_identity,
+    )
+    return {
+        "room_name": status.room_name,
+        "trusted_identity": status.trusted_identity,
+        "running": status.running,
+    }
+
+
+@app.get("/bot/status")
+def bot_status() -> dict[str, object]:
+    return {"bots": app.state.bot_manager.status()}
