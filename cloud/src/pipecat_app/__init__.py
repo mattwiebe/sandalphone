@@ -24,18 +24,31 @@ from .livekit_outbound import (
     validate_outbound_dial_request,
 )
 from .audio_policy import AudioMode, AudioPolicy, AudioPolicyConfig, MixPlan
+from .operability import (
+    AppConfig,
+    ConfigValidationError,
+    HealthReport,
+    MetricsCollector,
+    StructuredEventLogger,
+    build_health_report,
+    validate_config,
+)
 
 __all__ = [
     "AudioSource",
     "AudioMode",
     "AudioPolicy",
     "AudioPolicyConfig",
+    "AppConfig",
+    "ConfigValidationError",
+    "HealthReport",
     "LiveKitParticipant",
     "LiveKitRoomPolicy",
     "LiveKitSessionController",
     "InboundCallContext",
     "InboundSession",
     "InboundSipConfig",
+    "MetricsCollector",
     "OutboundDialRequest",
     "OutboundSession",
     "OutboundSessionStatus",
@@ -47,9 +60,12 @@ __all__ = [
     "SessionState",
     "TrackPublication",
     "MixPlan",
+    "StructuredEventLogger",
     "build_outbound_session",
+    "build_health_report",
     "create_inbound_session",
     "parse_inbound_call_context",
     "parse_inbound_sip_config",
+    "validate_config",
     "validate_outbound_dial_request",
 ]
