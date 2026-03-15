@@ -20,7 +20,7 @@ class _FakeQwenTTSClient:
 @pytest.mark.unit
 def test_create_tts_provider_defaults_to_vibevoice(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TTS_PROVIDER", raising=False)
-    monkeypatch.setattr(factory, "VibeVoiceClient", _FakeVibeVoiceClient)
+    monkeypatch.setattr(factory, "_load_vibevoice_client", lambda: _FakeVibeVoiceClient())
 
     provider = factory.create_tts_provider()
 
@@ -30,7 +30,7 @@ def test_create_tts_provider_defaults_to_vibevoice(monkeypatch: pytest.MonkeyPat
 @pytest.mark.unit
 def test_create_tts_provider_uses_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TTS_PROVIDER", "qwen")
-    monkeypatch.setattr(factory, "QwenTTSClient", _FakeQwenTTSClient)
+    monkeypatch.setattr(factory, "_load_qwen_client", lambda: _FakeQwenTTSClient())
 
     provider = factory.create_tts_provider()
 

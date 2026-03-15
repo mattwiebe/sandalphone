@@ -4,9 +4,20 @@ Supports multiple TTS providers (Qwen, VibeVoice) with runtime selection.
 """
 
 import os
+
 from tts.base import TTSProvider
-from tts.qwen_tts_client import QwenTTSClient
-from tts.vibevoice_client import VibeVoiceClient
+
+
+def _load_vibevoice_client() -> TTSProvider:
+    from tts.vibevoice_client import VibeVoiceClient
+
+    return VibeVoiceClient()
+
+
+def _load_qwen_client() -> TTSProvider:
+    from tts.qwen_tts_client import QwenTTSClient
+
+    return QwenTTSClient()
 
 
 def create_tts_provider(provider: str = None) -> TTSProvider:
@@ -44,10 +55,10 @@ def create_tts_provider(provider: str = None) -> TTSProvider:
 
     if provider == "vibevoice":
         print(f"TTS Provider: VibeVoice")
-        return VibeVoiceClient()
+        return _load_vibevoice_client()
     elif provider == "qwen":
         print(f"TTS Provider: Qwen")
-        return QwenTTSClient()
+        return _load_qwen_client()
     else:
         raise ValueError(
             f"Unknown TTS provider: '{provider}'. "
