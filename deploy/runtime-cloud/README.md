@@ -29,3 +29,14 @@ ssh hetzner 'sudo mv /tmp/levi-runtime-cloud.service /etc/systemd/system/levi-ru
 ssh hetzner 'systemctl status levi-runtime-cloud.service --no-pager'
 ssh hetzner 'curl -s http://127.0.0.1:8787/health'
 ```
+
+## Required Provider Env
+
+Set these in `/opt/levi-runtime-cloud/.env` before starting the trusted-leg bot:
+
+```bash
+ASSEMBLYAI_API_KEY=...
+DEEPL_API_KEY=...
+CARTESIA_API_KEY=...
+CARTESIA_VOICE_ID=...
+```

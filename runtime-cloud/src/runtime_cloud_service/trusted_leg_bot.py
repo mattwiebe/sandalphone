@@ -18,13 +18,13 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.services.google.stt import GoogleSTTService
-from pipecat.services.google.tts import GoogleTTSService
+from pipecat.services.assemblyai.stt import AssemblyAISTTService, AssemblyAISTTSettings
+from pipecat.services.cartesia.tts import CartesiaTTSService, CartesiaTTSSettings
 from pipecat.transcriptions.language import Language
 from pipecat.transports.livekit.transport import LiveKitOutputTransportMessageFrame
 from pipecat.transports.livekit.transport import LiveKitTransport
 
-from .translation_pipeline import GoogleTranslateClient, TranslationPipelineConfig, TranslationProcessor
+from .translation_pipeline import DeepLTranslateClient, TranslationPipelineConfig, TranslationProcessor
 
 
 class TextTranslator(Protocol):
@@ -46,6 +46,30 @@ class PassthroughTranslator:
         target_language: Language,
     ) -> str:
         return text
+
+
+@dataclass(frozen=True)
+class ProviderBundle:
+    assemblyai_api_key: str
+    deepl_api_key: str
+    cartesia_api_key: str
+    cartesia_voice_id: str
+
+
+def _require_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise ValueError(f"Missing required environment variable: {name}")
+    return value
+
+
+def build_provider_bundle_from_env() -> ProviderBundle:
+    return ProviderBundle(
+        assemblyai_api_key=_require_env("ASSEMBLYAI_API_KEY"),
+        deepl_api_key=_require_env("DEEPL_API_KEY"),
+        cartesia_api_key=_require_env("CARTESIA_API_KEY"),
+        cartesia_voice_id=_require_env("CARTESIA_VOICE_ID"),
+    )
 
 
 @dataclass(frozen=True)
@@ -152,6 +176,7 @@ class TrustedLegPipecatBot:
         self._task: PipelineTask | None = None
 
     async def run(self) -> None:
+        providers = build_provider_bundle_from_env()
         token = issue_bot_token(
             room_name=self._config.room_name,
             bot_identity=self._config.bot_identity,
@@ -164,14 +189,20 @@ class TrustedLegPipecatBot:
             token,
             self._config.room_name,
         )
-        stt = GoogleSTTService(
+        stt = AssemblyAISTTService(
+            api_key=providers.assemblyai_api_key,
             sample_rate=16000,
+            settings=AssemblyAISTTSettings(language=self._config.source_language),
         )
-        tts = GoogleTTSService(
-            voice_id=os.getenv("GOOGLE_TTS_VOICE"),
+        tts = CartesiaTTSService(
+            api_key=providers.cartesia_api_key,
             sample_rate=24000,
+            settings=CartesiaTTSSettings(
+                voice=providers.cartesia_voice_id,
+                model=os.getenv("CARTESIA_MODEL") or "sonic-3",
+            ),
         )
-        translator = GoogleTranslateClient()
+        translator = DeepLTranslateClient(api_key=providers.deepl_api_key)
 
         @transport.event_handler("on_connected")
         async def on_connected(_transport: LiveKitTransport) -> None:

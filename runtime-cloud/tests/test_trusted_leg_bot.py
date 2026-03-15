@@ -2,6 +2,7 @@ from pipecat.frames.frames import TTSSpeakFrame, TranscriptionFrame, Translation
 from pipecat.transcriptions.language import Language
 
 from runtime_cloud_service.trusted_leg_bot import (
+    build_provider_bundle_from_env,
     TrustedLegBotConfig,
     build_private_audio_permissions,
     build_trusted_translation_frames,
@@ -46,3 +47,17 @@ def test_build_trusted_translation_frames_emit_private_metadata_and_tts() -> Non
 
     assert isinstance(frames[2], TTSSpeakFrame)
     assert frames[2].text == "hello, good afternoon"
+
+
+def test_build_provider_bundle_from_env_uses_new_provider_keys(monkeypatch) -> None:
+    monkeypatch.setenv("ASSEMBLYAI_API_KEY", "assembly")
+    monkeypatch.setenv("DEEPL_API_KEY", "deepl")
+    monkeypatch.setenv("CARTESIA_API_KEY", "cartesia")
+    monkeypatch.setenv("CARTESIA_VOICE_ID", "voice-123")
+
+    providers = build_provider_bundle_from_env()
+
+    assert providers.assemblyai_api_key == "assembly"
+    assert providers.deepl_api_key == "deepl"
+    assert providers.cartesia_api_key == "cartesia"
+    assert providers.cartesia_voice_id == "voice-123"

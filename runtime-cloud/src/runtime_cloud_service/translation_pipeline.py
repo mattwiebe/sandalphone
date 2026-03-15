@@ -4,11 +4,20 @@ import json
 from dataclasses import dataclass
 from typing import Protocol
 
-from google.cloud import translate_v2 as translate
 from pipecat.frames.frames import InterimTranscriptionFrame, TTSSpeakFrame, TranscriptionFrame, TranslationFrame
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.transcriptions.language import Language
 from pipecat.transports.livekit.transport import LiveKitOutputTransportMessageFrame
+from requests import Session
+
+
+def _to_deepl_source_language(language: Language) -> str:
+    value = str(language).replace("_", "-").upper()
+    return value.split("-", 1)[0]
+
+
+def _to_deepl_target_language(language: Language) -> str:
+    return str(language).replace("_", "-").upper()
 
 
 class TextTranslator(Protocol):
@@ -28,9 +37,17 @@ class TranslationPipelineConfig:
     target_language: Language
 
 
-class GoogleTranslateClient:
-    def __init__(self) -> None:
-        self._client = translate.Client()
+class DeepLTranslateClient:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        api_url: str = "https://api-free.deepl.com/v2/translate",
+        session: Session | None = None,
+    ) -> None:
+        self._api_key = api_key
+        self._api_url = api_url
+        self._session = session or Session()
 
     def translate(
         self,
@@ -39,13 +56,24 @@ class GoogleTranslateClient:
         source_language: Language,
         target_language: Language,
     ) -> str:
-        result = self._client.translate(
-            text,
-            source_language=str(source_language),
-            target_language=str(target_language),
-            format_="text",
+        response = self._session.post(
+            self._api_url,
+            data={
+                "text": text,
+                "source_lang": _to_deepl_source_language(source_language),
+                "target_lang": _to_deepl_target_language(target_language),
+            },
+            headers={"Authorization": f"DeepL-Auth-Key {self._api_key}"},
+            timeout=10,
         )
-        return str(result["translatedText"])
+        response.raise_for_status()
+
+        payload = response.json()
+        translations = payload.get("translations", [])
+        if not translations or "text" not in translations[0]:
+            raise ValueError("DeepL response did not include translated text")
+
+        return str(translations[0]["text"])
 
 
 def build_translation_output_frames(

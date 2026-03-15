@@ -1,7 +1,11 @@
+from unittest.mock import Mock
+
+import pytest
 from pipecat.frames.frames import InterimTranscriptionFrame, TranscriptionFrame
 from pipecat.transcriptions.language import Language
 
 from runtime_cloud_service.translation_pipeline import (
+    DeepLTranslateClient,
     TranslationPipelineConfig,
     build_translation_output_frames,
 )
@@ -65,3 +69,50 @@ def test_interim_transcriptions_do_not_emit_output() -> None:
 
     assert frames == []
     assert translator.calls == []
+
+
+def test_deepl_translate_client_uses_auth_header_and_text_params() -> None:
+    response = Mock()
+    response.json.return_value = {"translations": [{"text": "hello there"}]}
+    response.raise_for_status.return_value = None
+
+    session = Mock()
+    session.post.return_value = response
+
+    client = DeepLTranslateClient(api_key="test-key", session=session)
+
+    translated = client.translate(
+        "hola",
+        source_language=Language.ES_MX,
+        target_language=Language.EN_US,
+    )
+
+    assert translated == "hello there"
+    session.post.assert_called_once_with(
+        "https://api-free.deepl.com/v2/translate",
+        data={
+            "text": "hola",
+            "source_lang": "ES",
+            "target_lang": "EN-US",
+        },
+        headers={"Authorization": "DeepL-Auth-Key test-key"},
+        timeout=10,
+    )
+
+
+def test_deepl_translate_client_raises_for_missing_translation_text() -> None:
+    response = Mock()
+    response.json.return_value = {"translations": [{}]}
+    response.raise_for_status.return_value = None
+
+    session = Mock()
+    session.post.return_value = response
+
+    client = DeepLTranslateClient(api_key="test-key", session=session)
+
+    with pytest.raises(ValueError, match="DeepL response did not include translated text"):
+        client.translate(
+            "hola",
+            source_language=Language.ES_MX,
+            target_language=Language.EN_US,
+        )
